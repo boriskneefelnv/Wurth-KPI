@@ -3,6 +3,7 @@ import type { DayKey, Direction, Ride, WmsUnit } from "../types";
 import type { PlannedRideIndex } from "../wms/rideLists";
 import { directionalDate, rideOf } from "../wms/rides";
 import { reconcileRideLists } from "./reconcile";
+import { LEAD_MONTHS } from "../wms/exportRange";
 
 /** Maximum relative difference between unit file HUs and ride list units. */
 export const MAX_UNIT_DEVIATION = 0.02;
@@ -179,7 +180,7 @@ export function rideIssues(
  * within 113 days. An unit export filtered on Laaddatum therefore has to start
  * well before the first month that is reported.
  */
-export const LAADDATUM_LEAD_MONTHS = 4;
+export const LAADDATUM_LEAD_MONTHS = LEAD_MONTHS;
 
 export interface ExportAdvice {
   /** Earliest Laaddatum in the unit export. */

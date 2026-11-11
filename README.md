@@ -9,19 +9,22 @@ en zendingen, berekent de operationele en klacht-KPI's en maakt de QBR-presentat
 De tool is een website die volledig in de browser draait: geen server, geen database. Alle bestanden
 blijven op de eigen computer.
 
-1. Exporteer uit de WMS: **Unitoverzicht** met laaddatum vanaf **vier maanden vóór** de eerste
-   rapportmaand (de laaddatum is de ophaaldatum bij de leverancier en ligt weken voor de rit; een export
-   stopt bij 50.000 rijen, splits dan in twee delen), **Te laden ritten** en **Te lossen ritten**.
-2. Open de tool en sleep alle bestanden tegelijk in het venster. De tool herkent zelf welk bestand wat is.
+1. Draai **Te laden ritten** en **Te lossen ritten** voor de periode die je wilt laten zien en sleep ze
+   in de tool.
+2. De tool geeft aan voor welke laaddatums je het **unitoverzicht** moet draaien (4 maanden ervoor
+   t/m 1 maand erna). Draai dat (bij 50.000 rijen in delen) en sleep het erbij. De tool meldt of het
+   bereik gedekt is.
 3. Controleer de aansluiting per maand en download zo nodig de controlelijst met afwijkende ritten.
 4. Kies de rapportsoort, periode en vergelijking.
-5. Klik op **Presenteren** (volledig scherm; ← → bladeren, G overzicht, Esc sluiten), of download de
-   presentatie als HTML (die zichzelf ook kan presenteren) of druk af als PDF.
+5. Klik op **Presenteren** (volledig scherm; ← → bladeren, G overzicht, F volledig scherm, Esc sluiten),
+   of download de presentatie als HTML: dat bestand presenteert precies zo, met dezelfde animaties.
+   Afdrukken of PDF geeft één slide per pagina.
 
 ### Via localdeploy
 
 De repo volgt route B van localdeploy: `package.json` met `package-lock.json` in de hoofdmap, en
-`npm run build` (Vite) zet de site in `dist/` met `dist/index.html`. Er is geen backend, geen `.env`
+`npm run build` bouwt eerst de presentatie-runtime (voor de HTML-export) en daarna de site in `dist/`
+met `dist/index.html`. Er is geen backend, geen `.env`
 en geen `config.js` nodig. De build gebruikt relatieve paden, dus de site werkt onder elk pad.
 
 ### Lokaal ontwikkelen

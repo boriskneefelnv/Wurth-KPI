@@ -1,24 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { finishAnimations, StaticRenderContext } from "./anim";
+import { DECK_KEYFRAMES, finishAnimations, StaticRenderContext } from "./anim";
 import type { SlideDef } from "./deck";
-import { SLIDE_H, SLIDE_W } from "./tokens";
+import { FONT, SLIDE_H, SLIDE_W } from "./tokens";
 
 /**
- * Full-screen presentation (after the original Würth presenter): the slide is
- * scaled to the screen, keys and click zones navigate, the controls fade out
- * when the mouse rests. Navigation never waits for an animation.
+ * Full-screen presentation (after the original Würth presenter). Used both in
+ * the app and in the exported HTML file, so both behave exactly the same.
  *
- * Keys: → / Space / PageDown next, ← / PageUp previous, Home / End,
- * 1–9 jump, G overview, F full screen, Esc leave full screen / close.
+ * No buttons on screen. Keys: → / Space / PageDown next, ← / PageUp previous,
+ * Home / End, 1–9 jump, G overview, F full screen on/off, Esc close (in the
+ * app; in an exported file Esc only leaves full screen). Clicking the left or right quarter navigates. The
+ * cursor hides when the mouse rests.
  */
-export function Presentation({ slides, start = 0, onClose }: { slides: SlideDef[]; start?: number; onClose: () => void }) {
+export function Presentation({
+  slides,
+  start = 0,
+  onClose,
+  standalone = false,
+}: {
+  slides: SlideDef[];
+  start?: number;
+  /** Called on Esc when not in full screen (the app). */
+  onClose?: () => void;
+  /** Exported file: show a start screen first, because full screen needs a click. */
+  standalone?: boolean;
+}) {
   const [idx, setIdx] = useState(Math.min(start, slides.length - 1));
   const [scale, setScale] = useState(1);
-  const [chrome, setChrome] = useState(true);
+  const [cursor, setCursor] = useState(true);
   const [overview, setOverview] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [started, setStarted] = useState(!standalone);
   const root = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<number | null>(null);
+  /** Set when we leave full screen ourselves (F), so that is not taken as "close". */
+  const leavingByToggle = useRef(false);
+
+  useDeckStyles();
 
   const go = useCallback(
     (i: number) => {
@@ -28,28 +45,54 @@ export function Presentation({ slides, start = 0, onClose }: { slides: SlideDef[
     [slides.length],
   );
 
-  const toggleFullscreen = useCallback(() => {
+  const enterFullscreen = useCallback(() => {
     if (!document.fullscreenElement) root.current?.requestFullscreen?.().catch(() => {});
-    else document.exitFullscreen().catch(() => {});
   }, []);
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) enterFullscreen();
+    else {
+      leavingByToggle.current = true;
+      document.exitFullscreen().catch(() => {});
+    }
+  }, [enterFullscreen]);
+
+  const begin = useCallback(() => {
+    enterFullscreen();
+    setStarted(true);
+  }, [enterFullscreen]);
+
+  // In full screen the browser itself uses Esc to leave it (the page never sees
+  // that key press). In the app, leaving full screen that way closes the presentation.
+  useEffect(() => {
+    const onFs = () => {
+      if (document.fullscreenElement) return;
+      if (leavingByToggle.current) leavingByToggle.current = false;
+      else onClose?.();
+    };
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, [onClose]);
 
   useEffect(() => {
-    // Start in full screen (the click on "Presenteren" counts as user gesture).
-    root.current?.requestFullscreen?.().catch(() => {});
-    const onFs = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onFs);
+    if (!standalone) enterFullscreen(); // the click on "Presenteren" counts as user gesture
     const fit = () => setScale(Math.min(window.innerWidth / SLIDE_W, window.innerHeight / SLIDE_H));
     fit();
     window.addEventListener("resize", fit);
     return () => {
-      document.removeEventListener("fullscreenchange", onFs);
       window.removeEventListener("resize", fit);
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      if (!standalone && document.fullscreenElement) document.exitFullscreen().catch(() => {});
     };
-  }, []);
+  }, [standalone, enterFullscreen]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!started) {
+        if (["Enter", " ", "ArrowRight", "f", "F"].includes(e.key)) {
+          e.preventDefault();
+          begin();
+        }
+        return;
+      }
       if (overview) {
         if (e.key === "Escape" || e.key === "g" || e.key === "G") {
           e.preventDefault();
@@ -88,9 +131,9 @@ export function Presentation({ slides, start = 0, onClose }: { slides: SlideDef[
           toggleFullscreen();
           break;
         case "Escape":
+          // Only reached outside full screen (in full screen the browser handles Esc).
           e.preventDefault();
-          if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-          else onClose();
+          onClose?.();
           break;
         default:
           if (/^[1-9]$/.test(e.key)) {
@@ -101,44 +144,46 @@ export function Presentation({ slides, start = 0, onClose }: { slides: SlideDef[
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [idx, overview, go, slides.length, onClose, toggleFullscreen]);
+  }, [idx, overview, started, go, begin, slides.length, onClose, toggleFullscreen]);
 
-  const bump = useCallback(() => {
-    setChrome(true);
-    if (hideTimer.current) window.clearTimeout(hideTimer.current);
-    hideTimer.current = window.setTimeout(() => setChrome(false), 2500);
-  }, []);
+  // Hide the cursor when the mouse rests.
   useEffect(() => {
+    const bump = () => {
+      setCursor(true);
+      if (hideTimer.current) window.clearTimeout(hideTimer.current);
+      hideTimer.current = window.setTimeout(() => setCursor(false), 2500);
+    };
     bump();
     window.addEventListener("mousemove", bump);
     return () => {
       window.removeEventListener("mousemove", bump);
       if (hideTimer.current) window.clearTimeout(hideTimer.current);
     };
-  }, [bump]);
+  }, []);
 
   const current = slides[idx]!;
   return (
-    <div ref={root} className="presenter" style={{ cursor: chrome ? "default" : "none" }}>
-      <button className="zone left" aria-label="Vorige slide" onClick={() => go(idx - 1)} />
-      <button className="zone right" aria-label="Volgende slide" onClick={() => go(idx + 1)} />
-      <div key={idx} className="stage" style={{ width: SLIDE_W, height: SLIDE_H, transform: `scale(${scale})` }}>
-        {current.render(idx + 1, slides.length)}
+    <div ref={root} className="presenter" style={{ cursor: cursor || overview || !started ? "default" : "none" }}>
+      {started && (
+        <>
+          <button className="zone left" aria-label="Vorige slide" onClick={() => go(idx - 1)} />
+          <button className="zone right" aria-label="Volgende slide" onClick={() => go(idx + 1)} />
+        </>
+      )}
+      <div key={started ? idx : "start"} className="stage" style={{ width: SLIDE_W, height: SLIDE_H, transform: `scale(${scale})` }}>
+        {started ? (
+          current.render(idx + 1, slides.length)
+        ) : (
+          <StaticRenderContext.Provider value={true}>{slides[0]!.render(1, slides.length)}</StaticRenderContext.Provider>
+        )}
       </div>
-      <div className="chrome" style={{ opacity: chrome ? 1 : 0, pointerEvents: chrome ? "auto" : "none" }}>
-        <span className="count">
-          {idx + 1} / {slides.length}
-        </span>
-        <button onClick={() => setOverview(true)} title="Overzicht (G)">
-          Overzicht
+      {!started && (
+        <button className="start" onClick={begin}>
+          <span className="play" aria-hidden="true" />
+          <span>Presentatie starten</span>
+          <small>Enter of klik · ← → bladeren · G overzicht · F volledig scherm</small>
         </button>
-        <button onClick={toggleFullscreen} title="Volledig scherm (F)">
-          {fullscreen ? "Venster" : "Volledig scherm"}
-        </button>
-        <button onClick={onClose} title="Sluiten (Esc)">
-          Sluiten
-        </button>
-      </div>
+      )}
       {overview && (
         <div className="overview" onClick={() => setOverview(false)}>
           <div className="overview-grid" onClick={(e) => e.stopPropagation()}>
@@ -167,3 +212,31 @@ export function Presentation({ slides, start = 0, onClose }: { slides: SlideDef[
     </div>
   );
 }
+
+/** Inserts the deck keyframes and presenter styles once per page. */
+function useDeckStyles() {
+  useEffect(() => {
+    if (document.getElementById("deck-styles")) return;
+    const el = document.createElement("style");
+    el.id = "deck-styles";
+    el.textContent = DECK_KEYFRAMES + PRESENTER_CSS;
+    document.head.appendChild(el);
+  }, []);
+}
+
+export const PRESENTER_CSS = `
+.presenter{position:fixed;inset:0;z-index:100;background:#000;display:grid;place-items:center;overflow:hidden;font-family:${FONT}}
+.presenter .stage{position:relative;z-index:1;transform-origin:center center;animation:deckFadeIn 250ms ease-out}
+.presenter .zone{position:absolute;top:0;bottom:0;width:25%;z-index:2;background:transparent;border:0;padding:0;cursor:inherit}
+.presenter .zone.left{left:0}
+.presenter .zone.right{right:0}
+.presenter .start{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:rgba(10,18,26,.55);border:0;color:#fff;font:600 20px ${FONT};cursor:pointer}
+.presenter .start .play{width:0;height:0;border-left:34px solid #fff;border-top:21px solid transparent;border-bottom:21px solid transparent;margin-left:8px}
+.presenter .start small{font-weight:400;font-size:12px;color:#cfd8e2}
+.presenter .overview{position:absolute;inset:0;z-index:4;background:rgba(10,18,26,.92);overflow:auto;padding:48px}
+.presenter .overview-grid{display:grid;grid-template-columns:repeat(auto-fill,260px);gap:24px;justify-content:center}
+.presenter .thumb{background:none;border:0;padding:0;color:#cfd8e2;font:12px ${FONT};text-align:left;display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.presenter .thumb-canvas{width:256px;height:144px;overflow:hidden;outline:2px solid transparent}
+.presenter .thumb.current .thumb-canvas,.presenter .thumb:hover .thumb-canvas{outline-color:#4fa0d4}
+`;

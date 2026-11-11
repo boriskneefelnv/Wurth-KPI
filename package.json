@@ -5,13 +5,14 @@
   "type": "module",
   "description": "Würth KPI- en QBR-tool van Neele-Vat",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "vite build -c vite.present.config.ts && vite",
+    "build": "vite build -c vite.present.config.ts && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "check": "tsc --noEmit && vitest run"
+    "check": "tsc --noEmit && vitest run",
+    "build:runtime": "vite build -c vite.present.config.ts"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

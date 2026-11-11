@@ -132,6 +132,17 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B69 | De app herkent een te laat beginnend unitoverzicht en geeft de laaddatum waarvanaf geëxporteerd moet worden. |
 | B70 | Ritten die net buiten de periode van de rittenlijst vallen (gescand binnen een week van de eerste of laatste lijstdatum, bv. gepland 1 juli en gescand 30 juni) krijgen in de controlelijst een eigen, onschuldige categorie. |
 
+## Begeleide import en presentatie-export (11 nov, avond)
+
+| # | Besluit |
+|---|---|
+| B71 | Werkwijze: eerst Te laden en Te lossen inslepen; de tool geeft dan de laaddatums waarvoor het unitoverzicht gedraaid moet worden: **4 maanden vóór de eerste ritmaand t/m 1 maand ná de laatste ritdatum** (niet later dan vandaag). Onderbouwing over 128.000 pallets (2025–2026): vóór de rit uitgaand 99,97% binnen 4 maanden, inkomend 99,98% binnen 2 maanden; na de rit 0,15% (uit) en 0,33% (in) meer dan een week, vrijwel niets meer dan een maand. |
+| B72 | Bestanden worden bij elkaar opgeteld (ook in delen); de tool toont per bestand de laaddatums en meldt welk deel van het advies nog ontbreekt. Losse bestanden zijn te verwijderen. |
+| B73 | Periodes stoppen bij de laatste dag met gescande pallets: geplande ritten in de toekomst maken een maand niet "volledig". |
+| B74 | Presentatiemodus zonder knoppen in beeld; bediening met toetsen en klikken op de zijkanten. Esc sluit (verlaten van volledig scherm via de browser sluit ook). |
+| B75 | De HTML-export bevat dezelfde presentatiecomponent als de app (runtime + rapportdata + beelden in één bestand): zelfde toetsen, overzicht en animaties. Start met een startscherm omdat volledig scherm een klik vraagt. Afdrukken geeft één slide per pagina. |
+| B76 | Met de exports van 11 nov (laaddatum sep 2024 t/m nov 2026) sluit elke maand van jan 2025 t/m nov 2026 aan (99,5–100%). |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

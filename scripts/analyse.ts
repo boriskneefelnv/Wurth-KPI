@@ -28,7 +28,8 @@ import { coverageFromRideLists, indexPlannedRides, parseRideList } from "../src/
 import { materializeRides } from "../src/core/wms/rides";
 import { readXlsx } from "../src/core/wms/xlsxReader";
 import { buildDeck } from "../src/deck/deck";
-import { deckDocument, renderSlidesStatic } from "../src/deck/exportHtml";
+import { interactiveDeckDocument, renderSlidesStatic } from "../src/deck/exportHtml";
+import { loadRuntime } from "./lib/brand";
 import { buildControlListXlsx, ISSUE_LABEL } from "../src/app/controlList";
 import { loadDeckAssets } from "./lib/brand";
 
@@ -115,8 +116,13 @@ for (const s of subjects) {
 if (args.out) {
   mkdirSync(args.out, { recursive: true });
   const file = join(args.out, `deck-${period.key}.html`);
-  const deck = buildDeck(set, new Date());
-  writeFileSync(file, deckDocument(renderSlidesStatic(deck, loadDeckAssets()), `QBR Würth ${period.label}`));
+  const meetingDate = new Date().toISOString().slice(0, 10);
+  const deck = buildDeck(set, new Date(`${meetingDate}T12:00:00`));
+  const assets = loadDeckAssets();
+  writeFileSync(
+    file,
+    interactiveDeckDocument({ runtime: loadRuntime(), data: { set, meetingDate, assets }, printSlides: renderSlidesStatic(deck, assets), title: `QBR Würth ${period.label}` }),
+  );
   console.log(`\n${file}`);
 }
 

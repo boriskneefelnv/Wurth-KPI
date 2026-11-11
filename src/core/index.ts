@@ -34,3 +34,4 @@ export * from "./report/quality";
 export * from "./slides/format";
 export * from "./holidays";
 export * from "./wms/detect";
+export * from "./wms/exportRange";

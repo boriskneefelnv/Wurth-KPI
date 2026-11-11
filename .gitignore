@@ -9,3 +9,5 @@ coverage
 data/
 # merkbestanden (logo, headerfoto) niet in een openbare repo
 assets/brand/
+# gebouwde presentatie-runtime (npm run build maakt hem aan)
+public/runtime/

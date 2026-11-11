@@ -11,7 +11,8 @@ import { join } from "node:path";
 import { makePeriod, eachDay, isWorkday } from "../src/core/period";
 import { computeReportSet } from "../src/core/report/report";
 import { buildDeck } from "../src/deck/deck";
-import { deckDocument, renderSlidesStatic } from "../src/deck/exportHtml";
+import { interactiveDeckDocument, renderSlidesStatic } from "../src/deck/exportHtml";
+import { loadRuntime } from "./lib/brand";
 import { loadDeckAssets } from "./lib/brand";
 import { parseDateValue, periodOf } from "../src/core/dates";
 import { storageBucket } from "../src/core/wms/enrich";
@@ -108,6 +109,11 @@ mkdirSync(outDir, { recursive: true });
 const units = syntheticUnits();
 const q2 = makePeriod("quarter", "2026-Q2");
 const set = computeReportSet(units, q2, ["previous", "lastYear"]);
-const deck = buildDeck(set, new Date());
-writeFileSync(join(outDir, "deck.html"), deckDocument(renderSlidesStatic(deck, loadDeckAssets()), "Deck preview (synthetic data)"));
+const meetingDate = new Date().toISOString().slice(0, 10);
+const deck = buildDeck(set, new Date(`${meetingDate}T12:00:00`));
+const assets = loadDeckAssets();
+writeFileSync(
+  join(outDir, "deck.html"),
+  interactiveDeckDocument({ runtime: loadRuntime(), data: { set, meetingDate, assets }, printSlides: renderSlidesStatic(deck, assets), title: "Deck preview (synthetic data)" }),
+);
 console.log(join(outDir, "deck.html"));

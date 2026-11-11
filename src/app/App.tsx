@@ -10,12 +10,13 @@ import {
 import { comparisonOptionsWithQuality, LAADDATUM_LEAD_MONTHS, periodQuality, rideIssues, unitExportAdvice } from "../core/report/quality";
 import { reconcileRideLists } from "../core/report/reconcile";
 import { computeReportSet } from "../core/report/report";
+import { checkUnitExport, LEAD_MONTHS, lastScanDay, TRAIL_MONTHS, unitExportRange } from "../core/wms/exportRange";
 import { coverageFromRideLists, indexPlannedRides } from "../core/wms/rideLists";
 import { materializeRides } from "../core/wms/rides";
 import { StaticRenderContext } from "../deck/anim";
 import { assetUrls } from "../deck/assets";
 import { buildDeck, longDate, type SlideDef } from "../deck/deck";
-import { deckDocument, inlineAssets, renderSlidesStatic } from "../deck/exportHtml";
+import { inlineAssets, interactiveDeckDocument, renderSlidesStatic } from "../deck/exportHtml";
 import { Presentation } from "../deck/Presentation";
 import { SLIDE_H, SLIDE_W } from "../deck/tokens";
 import { buildControlListXlsx } from "./controlList";
@@ -26,6 +27,9 @@ const COMPARISON_LABEL: Record<ComparisonKind, string> = { previous: "Vorige per
 const FILE_KIND_LABEL = { units: "Unitoverzicht", "ride-list-outbound": "Te laden ritten", "ride-list-inbound": "Te lossen ritten" } as const;
 
 const nl = (x: number) => x.toLocaleString("nl-NL");
+/** 2025-09-01 → 01-09-2025 (as typed in the WMS). */
+const nlDate = (k: string) => `${k.slice(8, 10)}-${k.slice(5, 7)}-${k.slice(0, 4)}`;
+const today = () => new Date().toISOString().slice(0, 10);
 const pct = (x: number | null) => (x === null ? "" : `${(x * 100).toLocaleString("nl-NL", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`);
 
 function download(name: string, data: BlobPart, type: string) {
@@ -49,12 +53,8 @@ export function App() {
   const [exporting, setExporting] = useState(false);
   const workerRef = useRef<Worker | null>(null);
 
-  async function load(fileList: FileList | File[]) {
-    const files = await Promise.all([...fileList].map(async (f) => ({ name: f.name, data: await f.arrayBuffer() })));
-    if (!files.length) return;
-    setError(null);
-    setBusy("Bestanden lezen…");
-    workerRef.current?.terminate();
+  // One worker for the session: it keeps the files read so far.
+  useEffect(() => {
     const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
     workerRef.current = worker;
     worker.onmessage = (e) => {
@@ -63,15 +63,30 @@ export function App() {
       if (m.type === "done") {
         setDataset(m.dataset!);
         setBusy(null);
-        worker.terminate();
       }
       if (m.type === "error") {
         setError(m.msg ?? "Onbekende fout");
         setBusy(null);
-        worker.terminate();
       }
     };
-    worker.postMessage({ files }, files.map((f) => f.data));
+    return () => worker.terminate();
+  }, []);
+
+  async function load(fileList: FileList | File[]) {
+    const files = await Promise.all([...fileList].map(async (f) => ({ name: f.name, data: await f.arrayBuffer() })));
+    if (!files.length || !workerRef.current) return;
+    setError(null);
+    setBusy("Bestanden lezen…");
+    workerRef.current.postMessage({ type: "add", files }, files.map((f) => f.data));
+  }
+
+  function removeFile(name: string) {
+    setBusy("Bijwerken…");
+    workerRef.current?.postMessage({ type: "remove", name });
+  }
+
+  function clearFiles() {
+    workerRef.current?.postMessage({ type: "clear" });
   }
 
   // Derived data
@@ -79,7 +94,10 @@ export function App() {
     if (!dataset || dataset.units.length === 0 || dataset.lists.length === 0) return null;
     const planned = indexPlannedRides(dataset.lists);
     const { rides } = materializeRides(dataset.units, { planned });
-    const coverage = coverageFromRideLists(dataset.lists);
+    // Ride lists may contain planned rides: stop at the last day pallets were actually scanned.
+    const listCoverage = coverageFromRideLists(dataset.lists);
+    const lastScan = lastScanDay(dataset.units);
+    const coverage = listCoverage && lastScan && lastScan < listCoverage.to ? { ...listCoverage, to: lastScan } : listCoverage;
     return { planned, rides, coverage };
   }, [dataset]);
 
@@ -107,12 +125,15 @@ export function App() {
   const usable = options.filter((o) => o.usable && chosen.includes(o.kind)).map((o) => o.kind);
   const periodOk = period && quality ? quality(period) : null;
 
-  const slides: SlideDef[] = useMemo(() => {
-    if (!period || !dataset || !base) return [];
-    const set = computeReportSet(dataset.units, period, usable, {}, base.rides);
-    return buildDeck(set, new Date(`${meetingDate}T12:00:00`));
+  const reportSet = useMemo(() => {
+    if (!period || !dataset || !base) return null;
+    return computeReportSet(dataset.units, period, usable, {}, base.rides);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, dataset, base, usable.join(","), meetingDate]);
+  }, [period, dataset, base, usable.join(",")]);
+  const slides: SlideDef[] = useMemo(
+    () => (reportSet ? buildDeck(reportSet, new Date(`${meetingDate}T12:00:00`)) : []),
+    [reportSet, meetingDate],
+  );
 
   const monthly = useMemo(() => {
     if (!base?.coverage || !dataset) return null;
@@ -120,6 +141,13 @@ export function App() {
     const r = reconcileRideLists(dataset.units, base.planned, base.rides, full);
     return r.inbound.perBucket.map((b, i) => ({ key: b.key, from: b.from, to: b.to, inbound: b, outbound: r.outbound.perBucket[i]! }));
   }, [base, dataset]);
+
+  // Which Laaddatum range the unit overview must cover, given the ride lists.
+  const exportAdvice = useMemo(() => (dataset?.lists.length ? unitExportRange(dataset.lists, today()) : null), [dataset]);
+  const exportCheck = useMemo(
+    () => (exportAdvice && dataset?.units.length ? checkUnitExport(dataset.units, exportAdvice) : null),
+    [exportAdvice, dataset],
+  );
 
   // Months that do not match, and whether the unit export simply starts too late for them.
   const advice = useMemo(() => {
@@ -143,9 +171,17 @@ export function App() {
     download(`Controlelijst ritten ${dataRange.from} tm ${dataRange.to}.xlsx`, await buildControlListXlsx(issues), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   }
 
+  /** One HTML file with the same presentation as in the app (runtime, data and images inside). */
   async function standaloneDeck(): Promise<string> {
+    if (!reportSet) throw new Error("Geen rapport");
     const assets = await inlineAssets(assetUrls(import.meta.env.BASE_URL));
-    return deckDocument(renderSlidesStatic(slides, assets), `QBR Würth ${period?.label ?? ""}`);
+    const runtime = await (await fetch(`${import.meta.env.BASE_URL}runtime/present.js`)).text();
+    return interactiveDeckDocument({
+      runtime,
+      data: { set: reportSet, meetingDate, assets },
+      printSlides: renderSlidesStatic(slides, assets),
+      title: `QBR Würth ${reportSet.current.period.label}`,
+    });
   }
 
   async function exportHtml() {
@@ -166,7 +202,7 @@ export function App() {
     try {
       w.document.write(await standaloneDeck());
       w.document.close();
-      setTimeout(() => w.print(), 800);
+      setTimeout(() => w.print(), 1200);
     } finally {
       setExporting(false);
     }
@@ -182,10 +218,14 @@ export function App() {
       <section className="panel">
         <div className="eyebrow">Stap 1</div>
         <h2>Bestanden</h2>
-        <p className="muted">
-          Sleep hier het unitoverzicht (een of meer bestanden), Te laden ritten en Te lossen ritten in. De tool herkent zelf welk bestand wat is.
-          Alles blijft op deze computer.
-        </p>
+        <ol className="steps">
+          <li>
+            Draai <strong>Te laden ritten</strong> en <strong>Te lossen ritten</strong> voor de periode die je wilt laten zien (bijvoorbeeld
+            01-01-2026 t/m 30-06-2026) en sleep ze hieronder in.
+          </li>
+          <li>De tool zegt dan voor welke laaddatums je het <strong>unitoverzicht</strong> moet draaien. Sleep dat er daarna bij.</li>
+        </ol>
+        <p className="muted">Bestanden worden bij elkaar opgeteld; de tool herkent zelf wat wat is. Alles blijft op deze computer.</p>
         <label
           className="drop"
           onDragOver={(e) => e.preventDefault()}
@@ -199,9 +239,37 @@ export function App() {
         </label>
         {busy && <p className="busy">{busy}</p>}
         {error && <p className="error">{error}</p>}
-        {dataset && <FileTable files={dataset.files} />}
-        {dataset && !base && (
-          <p className="error">Voor het rapport zijn minstens een unitoverzicht en de rittenlijsten nodig.</p>
+        {exportAdvice && (
+          <div className={`advice ${exportCheck?.ok ? "ok" : ""}`}>
+            <div className="eyebrow">Unitoverzicht draaien</div>
+            <p className="big">
+              Laaddatum van <strong>{nlDate(exportAdvice.from)}</strong> t/m <strong>{nlDate(exportAdvice.to)}</strong>
+            </p>
+            <p className="muted">
+              De ritten lopen van {nlDate(exportAdvice.rides.from)} t/m {nlDate(exportAdvice.rides.to)}. De laaddatum is de ophaaldatum bij de
+              leverancier en ligt meestal weken vóór de rit door het magazijn, soms ook kort erna. Daarom {LEAD_MONTHS} maanden ervoor en{" "}
+              {TRAIL_MONTHS} maand erna (zo valt 99,97% van de pallets erin, gemeten over 2025 en 2026). Geeft de WMS precies 50.000 rijen,
+              draai de periode dan in twee of meer delen en sleep ze allemaal in.
+            </p>
+            {exportCheck &&
+              (exportCheck.ok ? (
+                <p className="ok">
+                  De ingeladen unitoverzichten dekken dit (laaddatum {nlDate(exportCheck.loaded!.from)} t/m {nlDate(exportCheck.loaded!.to)}).
+                </p>
+              ) : (
+                <p className="warn">
+                  Nog niet gedekt:
+                  {exportCheck.missingStart && ` laaddatum ${nlDate(exportCheck.missingStart.from)} t/m ${nlDate(exportCheck.missingStart.to)}`}
+                  {exportCheck.missingStart && exportCheck.missingEnd && " en"}
+                  {exportCheck.missingEnd && ` laaddatum ${nlDate(exportCheck.missingEnd.from)} t/m ${nlDate(exportCheck.missingEnd.to)}`}. Draai dat
+                  deel erbij en sleep het in.
+                </p>
+              ))}
+          </div>
+        )}
+        {dataset && dataset.files.length > 0 && <FileTable files={dataset.files} onRemove={removeFile} onClear={clearFiles} />}
+        {dataset && dataset.lists.length > 0 && dataset.units.length === 0 && (
+          <p className="muted">Sleep nu het unitoverzicht erbij.</p>
         )}
       </section>
 
@@ -358,7 +426,14 @@ function flag(x: number | null) {
   return Math.abs(1 - x) <= 0.02 ? "ok" : "warn";
 }
 
-function FileTable({ files }: { files: FileInfo[] }) {
+function FileTable({ files, onRemove, onClear }: { files: FileInfo[]; onRemove: (name: string) => void; onClear: () => void }) {
+  const note = (f: FileInfo) => {
+    if (f.error) return f.error;
+    if (f.warning) return f.warning;
+    const range = f.dateRange ? `${f.kind === "units" ? "Laaddatum" : "Ritten"} ${nlDate(f.dateRange.from)} t/m ${nlDate(f.dateRange.to)}` : "";
+    const overlap = f.added !== undefined && f.added < f.rows ? `; ${nl(f.rows - f.added)} rijen overlappen met een ander unitoverzicht` : "";
+    return range + overlap;
+  };
   return (
     <table className="grid">
       <thead>
@@ -367,6 +442,11 @@ function FileTable({ files }: { files: FileInfo[] }) {
           <th>Soort</th>
           <th className="num">Rijen</th>
           <th>Opmerking</th>
+          <th className="num">
+            <button className="link" onClick={onClear}>
+              Alles wissen
+            </button>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -375,14 +455,11 @@ function FileTable({ files }: { files: FileInfo[] }) {
             <td>{f.name}</td>
             <td>{f.kind ? FILE_KIND_LABEL[f.kind] : ""}</td>
             <td className="num">{nl(f.rows)}</td>
-            <td className={f.error || f.warning ? "warn" : "muted"}>
-              {f.error ??
-                f.warning ??
-                (f.dateRange
-                  ? `Ritten ${f.dateRange.from} t/m ${f.dateRange.to}`
-                  : f.added !== undefined && f.added < f.rows
-                    ? `${nl(f.rows - f.added)} rijen overlappen met een ander unitoverzicht`
-                    : "")}
+            <td className={f.error || f.warning ? "warn" : "muted"}>{note(f)}</td>
+            <td className="num">
+              <button className="link" onClick={() => onRemove(f.name)}>
+                Verwijderen
+              </button>
             </td>
           </tr>
         ))}

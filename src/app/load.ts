@@ -3,6 +3,7 @@ import { detectExport, type ExportKind } from "../core/wms/detect";
 import { enrichWms, type EnrichValidation } from "../core/wms/enrich";
 import { parseRideList, type ParsedRideList } from "../core/wms/rideLists";
 import { readXlsx } from "../core/wms/xlsxReader";
+import { dayKey } from "../core/dates";
 import type { WmsUnit } from "../core/types";
 
 export interface FileInfo {
@@ -11,6 +12,7 @@ export interface FileInfo {
   rows: number;
   /** Rows taken over from this file (unit exports overlap). */
   added?: number;
+  /** Ride lists: planned dates; unit overviews: Laaddatum range. */
   dateRange?: { from: string; to: string } | null;
   warning?: string;
   error?: string;
@@ -23,41 +25,87 @@ export interface Dataset {
   lists: ParsedRideList[];
 }
 
-/** Read, recognise and combine the dropped WMS exports. Runs in a web worker. */
-export async function loadExports(files: { name: string; data: ArrayBuffer }[], progress: (msg: string) => void = () => {}): Promise<Dataset> {
-  const infos: FileInfo[] = [];
-  const unitParts: { info: FileInfo; parsed: ParsedWms }[] = [];
-  const lists: ParsedRideList[] = [];
-  for (const f of files) {
-    progress(`${f.name} lezen…`);
-    const info: FileInfo = { name: f.name, kind: null, rows: 0 };
-    infos.push(info);
-    try {
-      const sheets = await readXlsx(new Uint8Array(f.data));
-      info.kind = detectExport(sheets);
-      if (info.kind === "units") {
-        const parsed = parseWmsSheets(sheets);
-        info.rows = parsed.rows.length;
-        if (parsed.rows.length >= WMS_EXPORT_ROW_LIMIT) {
-          info.warning = `Precies ${WMS_EXPORT_ROW_LIMIT.toLocaleString("nl-NL")} rijen: waarschijnlijk afgekapt door de WMS. Exporteer in kleinere periodes.`;
+interface Entry {
+  info: FileInfo;
+  parsed?: ParsedWms;
+  list?: ParsedRideList;
+}
+
+function laaddatumRange(p: ParsedWms): { from: string; to: string } | null {
+  let from: string | null = null;
+  let to: string | null = null;
+  for (const r of p.rows) {
+    const v = r["Laaddatum"];
+    const d = v instanceof Date ? v : null;
+    if (!d) continue;
+    const k = dayKey(d);
+    if (from === null || k < from) from = k;
+    if (to === null || k > to) to = k;
+  }
+  return from && to ? { from, to } : null;
+}
+
+/**
+ * Keeps the exports dropped so far (runs in a web worker). Files are read
+ * once; adding or removing a file only redoes the cheap merge and enrichment.
+ * A file with the same name replaces the earlier one.
+ */
+export class ExportStore {
+  private entries = new Map<string, Entry>();
+
+  async add(files: { name: string; data: ArrayBuffer }[], progress: (msg: string) => void = () => {}) {
+    for (const f of files) {
+      progress(`${f.name} lezen…`);
+      const info: FileInfo = { name: f.name, kind: null, rows: 0 };
+      const entry: Entry = { info };
+      try {
+        const sheets = await readXlsx(new Uint8Array(f.data));
+        info.kind = detectExport(sheets);
+        if (info.kind === "units") {
+          entry.parsed = parseWmsSheets(sheets);
+          info.rows = entry.parsed.rows.length;
+          info.dateRange = laaddatumRange(entry.parsed);
+          if (entry.parsed.rows.length >= WMS_EXPORT_ROW_LIMIT) {
+            info.warning = `Precies ${WMS_EXPORT_ROW_LIMIT.toLocaleString("nl-NL")} rijen: waarschijnlijk afgekapt door de WMS. Draai de periode in twee delen.`;
+          }
+        } else if (info.kind) {
+          entry.list = parseRideList(sheets, info.kind === "ride-list-outbound" ? "outbound" : "inbound");
+          info.rows = entry.list.rawRowCount;
+          info.dateRange = entry.list.dateRange;
+        } else {
+          info.error = "Niet herkend als unitoverzicht, Te laden of Te lossen.";
         }
-        unitParts.push({ info, parsed });
-      } else if (info.kind) {
-        const list = parseRideList(sheets, info.kind === "ride-list-outbound" ? "outbound" : "inbound");
-        info.rows = list.rawRowCount;
-        info.dateRange = list.dateRange;
-        lists.push(list);
-      } else {
-        info.error = "Niet herkend als unitoverzicht, Te laden of Te lossen.";
+      } catch (e) {
+        info.error = e instanceof Error ? e.message : String(e);
       }
-    } catch (e) {
-      info.error = e instanceof Error ? e.message : String(e);
+      this.entries.set(f.name, entry);
     }
   }
-  if (unitParts.length === 0) return { files: infos, units: [], validation: null, lists };
-  progress("Unitoverzichten samenvoegen en controleren…");
-  const merged = mergeWmsExports(unitParts.map((p) => p.parsed));
-  merged.sources.forEach((s, i) => (unitParts[i]!.info.added = s.added));
-  const enriched = enrichWms(merged);
-  return { files: infos, units: enriched.units, validation: enriched.validation, lists };
+
+  remove(name: string) {
+    this.entries.delete(name);
+  }
+
+  clear() {
+    this.entries.clear();
+  }
+
+  dataset(progress: (msg: string) => void = () => {}): Dataset {
+    const all = [...this.entries.values()];
+    const lists = all.flatMap((e) => (e.list ? [e.list] : []));
+    const unitEntries = all.filter((e) => e.parsed);
+    if (unitEntries.length === 0) return { files: all.map((e) => e.info), units: [], validation: null, lists };
+    progress("Unitoverzichten samenvoegen en controleren…");
+    const merged = mergeWmsExports(unitEntries.map((e) => e.parsed!));
+    merged.sources.forEach((s, i) => (unitEntries[i]!.info.added = s.added));
+    const enriched = enrichWms(merged);
+    return { files: all.map((e) => e.info), units: enriched.units, validation: enriched.validation, lists };
+  }
+}
+
+/** One-shot helper (scripts, tests). */
+export async function loadExports(files: { name: string; data: ArrayBuffer }[], progress?: (msg: string) => void): Promise<Dataset> {
+  const store = new ExportStore();
+  await store.add(files, progress);
+  return store.dataset(progress);
 }

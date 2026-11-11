@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { AssetsContext, type DeckAssets } from "./assets";
-import { DECK_KEYFRAMES, StaticRenderContext } from "./anim";
+import type { ReportSet } from "../core/report/report";
+import { StaticRenderContext } from "./anim";
 import type { SlideDef } from "./deck";
 import { SLIDE_H, SLIDE_W } from "./tokens";
 
@@ -15,54 +16,46 @@ export function renderSlidesStatic(slides: SlideDef[], assets: DeckAssets): stri
   );
 }
 
+/** Data embedded in an exported deck (read by src/present/main.tsx). */
+export interface EmbeddedDeckData {
+  set: ReportSet;
+  meetingDate: string;
+  assets: DeckAssets;
+}
+
+const scriptSafe = (s: string) => s.replace(/<\/(script)/gi, "<\\/$1");
+
 /**
- * Standalone HTML deck. Opens as a presentation (one slide, scaled to the
- * window; arrows, space, click, F for full screen) and prints one slide per
- * landscape page. Images must be data: URIs for the file to work on its own.
+ * Standalone HTML deck with exactly the presentation of the app: the same
+ * React component and slides (the presentation runtime), the report data and
+ * images embedded. Printing gives one static slide per landscape page.
  */
-export function deckDocument(slidesHtml: string[], title: string): string {
-  const sections = slidesHtml.map((h, i) => `<section class="s${i === 0 ? " on" : ""}">${h}</section>`).join("\n");
+export function interactiveDeckDocument(opts: { runtime: string; data: EmbeddedDeckData; printSlides: string[]; title: string }): string {
+  const json = JSON.stringify(opts.data).replace(/</g, "\\u003c");
+  const print = opts.printSlides.map((h) => `<section class="p">${h}</section>`).join("\n");
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title.replace(/</g, "&lt;")}</title>
+<title>${opts.title.replace(/</g, "&lt;")}</title>
 <style>
-*{box-sizing:border-box}
 html,body{margin:0;height:100%;background:#000;overflow:hidden}
-.s{position:fixed;left:50%;top:50%;width:${SLIDE_W}px;height:${SLIDE_H}px;margin:-${SLIDE_H / 2}px 0 0 -${SLIDE_W / 2}px;display:none}
-.s.on{display:block;animation:deckFadeIn 250ms ease-out}
-.hint{position:fixed;left:50%;top:14px;transform:translateX(-50%);padding:6px 12px;border-radius:12px;background:rgba(10,18,26,.75);font:12px Tahoma,Arial,sans-serif;color:#e4edf5;opacity:1;transition:opacity .6s;pointer-events:none}
-${DECK_KEYFRAMES}
+.print{display:none}
 @page{size:${SLIDE_W}px ${SLIDE_H}px;margin:0}
 @media print{
   html,body{background:none;overflow:visible;height:auto}
-  .s{position:static;display:block !important;margin:0;transform:none !important;break-after:page;animation:none}
-  .hint{display:none}
+  #root{display:none}
+  .print{display:block}
+  .p{width:${SLIDE_W}px;height:${SLIDE_H}px;overflow:hidden;break-after:page}
 }
 </style>
 </head>
 <body>
-${sections}
-<div class="hint">← → bladeren · F volledig scherm · Ctrl+P afdrukken</div>
-<script>
-(function(){
-  var s=[].slice.call(document.querySelectorAll('.s')),i=0,hint=document.querySelector('.hint');
-  function fit(){var k=Math.min(innerWidth/${SLIDE_W},innerHeight/${SLIDE_H});s.forEach(function(x){x.style.transform='scale('+k+')'});}
-  function show(n){i=Math.max(0,Math.min(s.length-1,n));s.forEach(function(x,j){x.classList.toggle('on',j===i)});}
-  addEventListener('resize',fit);fit();
-  addEventListener('keydown',function(e){
-    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();show(i+1)}
-    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();show(i-1)}
-    else if(e.key==='Home'){show(0)}else if(e.key==='End'){show(s.length-1)}
-    else if(e.key==='f'||e.key==='F'){if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen()}
-    else if(/^[1-9]$/.test(e.key)){show(+e.key-1)}
-  });
-  addEventListener('click',function(e){show(e.clientX<innerWidth/3?i-1:i+1)});
-  setTimeout(function(){hint.style.opacity=0},3000);
-})();
-</script>
+<div id="root"></div>
+<div class="print">${print}</div>
+<script>window.__DECK__=${json};</script>
+<script>${scriptSafe(opts.runtime)}</script>
 </body>
 </html>`;
 }

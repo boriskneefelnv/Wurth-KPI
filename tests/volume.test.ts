@@ -123,3 +123,10 @@ describe("volume reconciliation", () => {
     });
   });
 });
+
+describe("export", () => {
+  it("embeds the report as JSON without losing anything", () => {
+    const set = computeReportSet(units, makePeriod("quarter", "2026-Q2"), ["previous", "lastYear"]);
+    expect(JSON.parse(JSON.stringify(set))).toEqual(set);
+  });
+});
