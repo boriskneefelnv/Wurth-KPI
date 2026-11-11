@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import type { ReportSet } from "../core/report/report";
+import { punctualitySlide } from "../core/slides/punctuality";
 import { volumeSlide, type VolumeSlideSubject } from "../core/slides/volume";
+import { PunctualitySlide } from "./slides/PunctualitySlide";
 import { ClosingSlide } from "./slides/ClosingSlide";
 import { CoverSlide } from "./slides/CoverSlide";
 import { DividerSlide } from "./slides/DividerSlide";
@@ -52,7 +54,7 @@ export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
       id: "divider-workload",
       title: "Section 01 Workload",
       render: (page, total) => (
-        <DividerSlide number="01" title="Workload" subtitle="Inbound and outbound volume per principal." footer={footer} page={page} total={total} />
+        <DividerSlide number="01" title="Workload" subtitle="Volume per principal and on time performance." footer={footer} page={page} total={total} />
       ),
     },
     ...subjects.map(({ id, subject }) => ({
@@ -60,6 +62,16 @@ export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
       title: subject === "Total" ? "Total volume" : `${subject} volume`,
       render: (page: number, total: number) => <VolumeSlide model={volumeSlide(set, subject)} page={page} total={total} />,
     })),
+    {
+      id: "on-time-loading",
+      title: "On time loading",
+      render: (page: number, total: number) => <PunctualitySlide model={punctualitySlide(set, "loading")} page={page} total={total} />,
+    },
+    {
+      id: "inbound-stocked",
+      title: "Inbound stocked on time",
+      render: (page: number, total: number) => <PunctualitySlide model={punctualitySlide(set, "stocking")} page={page} total={total} />,
+    },
     { id: "closing", title: "Closing", render: () => <ClosingSlide footer={`Würth · ${p.label}`} /> },
   ];
 }

@@ -151,6 +151,16 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B78 | Per bron een status: nog niet ingeladen, compleet, of "nog draaien: van t/m". Bij een export van 50.000 rijen geldt de laatste dag als onvolledig en begint het ontbrekende stuk op die dag; overlap met een volgend deel telt niet dubbel. Losse uitschieterdatums (meer dan twee weken van de rest) en het laatste 0,1% van een afgekapt bestand worden genegeerd. Gaten tot een week aan de randen en tot twee weken tussen bestanden (weekend, kerst) worden niet gemeld. |
 | B79 | Rapportperiodes en de aansluitingstabel beperken zich tot de gekozen periode. De soort rapport volgt de lengte (1 maand: maand, 3: kwartaal, 6: half jaar, 12: jaar). De keuze wordt in de browser onthouden. |
 
+## On time slides (12 nov)
+
+| # | Besluit |
+|---|---|
+| B80 | On time loading: een uitgaande rit is op tijd als de **laatste** pallet uiterlijk op de verwachte datum (Te laden) is gescand. Strenger dan Lovable (eerste pallet). Mrt 2025 t/m okt 2026: 95,4% (eerste pallet: 96,3%). Instelbaar terug (`onTimeRule: "earliest"`). |
+| B81 | Er wordt op dag gemeten, niet op tijd: "Tijd" in Te laden is bij 95% van de ritten 13:00 (een standaardwaarde, geen laadslot). |
+| B82 | De afspraak is de verwachte datum (besloten). Let op: "Gewijzigd" staat bij 3.244 van 3.265 laadritten op Y; als die datum achteraf naar de echte laaddag wordt gezet, valt het percentage gunstiger uit. |
+| B83 | Inbound stocked on time (aparte slide): een inkomende rit is op tijd als alle pallets uiterlijk op de verwachte losdag (Te lossen) zijn ingeslagen. Tweede cijfer: binnen één werkdag. Zonder rittenlijst niet meetbaar (de Losdatum in het unitoverzicht is geen magazijndatum). Doel voorlopig 95%. |
+| B84 | Opzet (rustig): groot percentage met doel en status, vergelijking in procentpunten, principals als kleine cijfers, één grafiek per maand met doellijn; staven onder het doel in oranje; vergelijkingsperiode als markering. Te late ritten samengevat in werkdagen. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

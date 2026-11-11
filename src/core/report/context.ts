@@ -11,8 +11,8 @@ export interface ReportOptions {
    */
   holidays?: Iterable<DayKey>;
   /**
-   * On-time loading rule. `earliest` (Lovable behaviour): earliest outbound
-   * scan vs planned departure. `latest`: every HU must be out by the planned day.
+   * On-time loading rule. `latest` (default): the whole ride (last pallet) is
+   * out by the planned day. `earliest` (Lovable behaviour): loading started by then.
    */
   onTimeRule?: "earliest" | "latest";
   /**
@@ -85,7 +85,7 @@ export function buildContext(
     rides: rideIndex,
     unitsByRide,
     holidays,
-    options: { onTimeRule: options.onTimeRule ?? "earliest", huDating },
+    options: { onTimeRule: options.onTimeRule ?? "latest", huDating },
     inPeriod: (d) => d !== null && inRange(dayKey(d), period),
     unitDay,
     unitInPeriod: (u, direction) => {

@@ -8,6 +8,8 @@ import { computeStock } from "@/core/report/stock";
 import { computeStorage, computeStorageTop } from "@/core/report/storage";
 import { computeContainerMix, computeDestinations, computeVolume } from "@/core/report/workload";
 import type { WmsUnit } from "@/core/types";
+import type { PlannedRideIndex } from "@/core/wms/rideLists";
+import { materializeRides } from "@/core/wms/rides";
 import { customPeriod, makePeriod, type ReportPeriod } from "@/core/period";
 import { periodEnd } from "@/core/dates";
 import { times, unit } from "./fixtures";
@@ -106,6 +108,18 @@ describe("outbound totals", () => {
   });
 });
 
+/** Ride list index with the given planned rides. */
+function plannedIndex(rides: [direction: "inbound" | "outbound", rit: string, date: string, units: number][]): PlannedRideIndex {
+  const idx: PlannedRideIndex = { inbound: new Map(), outbound: new Map() };
+  for (const [direction, ritNummer, plannedDate, n] of rides) {
+    idx[direction].set(ritNummer, {
+      direction, ritNummer, plannedDate, plannedTime: "13:00:00", units: n, shipments: 1, status: direction === "outbound" ? "Geladen" : "Gelost",
+      completed: true, referentie: "", afdeling: "2665", rowCount: 1, isTest: false, isCancelled: false,
+    });
+  }
+  return idx;
+}
+
 describe("on-time loading", () => {
   const units = [
     // R1 on time (same day)
@@ -119,17 +133,25 @@ describe("on-time loading", () => {
     unit({ uitgaandeRit: "R4", uitslag: "2026-04-05" }),
   ];
 
-  it("earliest rule (default)", () => {
+  it("last pallet rule (default): the whole ride out by the planned day", () => {
     const r = computeOnTimeLoading(ctx(units, ["2026-04"]));
-    expect(r).toMatchObject({ ok: 2, notOk: 1, notMeasurable: 1, target: 95, meetsTarget: false });
-    expect(r.pct).toBeCloseTo(66.667, 2);
+    expect(r).toMatchObject({ ok: 1, notOk: 2, notMeasurable: 1, target: 95, meetsTarget: false });
     expect(r.perPrincipal.WIAG).toMatchObject({ ok: 1, notOk: 1 });
-    expect(r.exceptions.map((e) => e.ritNummer)).toEqual(["R3"]);
+    expect(r.exceptions.map((e) => e.ritNummer)).toEqual(["R2", "R3"]);
   });
 
-  it("latest rule requires every HU out by the planned day", () => {
-    const r = computeOnTimeLoading(ctx(units, ["2026-04"], { onTimeRule: "latest" }));
-    expect(r).toMatchObject({ ok: 1, notOk: 2 });
+  it("earliest rule (as in Lovable): loading started by the planned day", () => {
+    const r = computeOnTimeLoading(ctx(units, ["2026-04"], { onTimeRule: "earliest" }));
+    expect(r).toMatchObject({ ok: 2, notOk: 1 });
+  });
+
+  it("uses the ride list date and counts lateness in workdays", () => {
+    // List: R2 planned Thu 2 Apr (last pallet Fri 3 Apr: 1 workday late),
+    //       R3 planned Wed 1 Apr (out Sun 5 Apr: Thu+Fri = 2 workdays late)
+    const planned = plannedIndex([["outbound", "R1", "2026-04-02", 1], ["outbound", "R2", "2026-04-02", 31], ["outbound", "R3", "2026-04-01", 1]]);
+    const { rides } = materializeRides(units, { planned });
+    const r = computeOnTimeLoading(buildContext(units, months(["2026-04"]), {}, rides));
+    expect(r).toMatchObject({ ok: 1, notOk: 2, notMeasurable: 0, lateByWorkdays: { 1: 1, 2: 1 }, withinOneWorkday: { ok: 2, notOk: 1 } });
   });
 
   it("returns null pct when nothing is measurable", () => {
@@ -138,16 +160,23 @@ describe("on-time loading", () => {
 });
 
 describe("inbound stocked", () => {
-  it("requires every HU of the ride to be stocked on or before the unloading day", () => {
+  it("every pallet scanned in by the planned unloading day from Te lossen", () => {
     const units = [
-      unit({ inkomendeRit: "I1", inslag: "2026-04-02 20:00", losdatum: "2026-04-02 07:00" }),
-      unit({ inkomendeRit: "I1", inslag: "2026-04-02 21:00", losdatum: "2026-04-02 07:00" }),
-      unit({ inkomendeRit: "I2", inslag: "2026-04-02", losdatum: "2026-04-02" }),
-      unit({ inkomendeRit: "I2", inslag: "2026-04-03", losdatum: "2026-04-02" }),
-      unit({ inkomendeRit: "I3", inslag: "2026-04-03" }), // no unloading date
+      unit({ inkomendeRit: "I1", inslag: "2026-04-02 20:00" }),
+      unit({ inkomendeRit: "I1", inslag: "2026-04-02 21:00" }),
+      unit({ inkomendeRit: "I2", inslag: "2026-04-02" }),
+      unit({ inkomendeRit: "I2", inslag: "2026-04-03" }), // a day after unloading
+      unit({ inkomendeRit: "I3", inslag: "2026-04-03" }), // not on the list
     ];
-    const r = computeInboundStocked(ctx(units, ["2026-04"]));
-    expect(r).toMatchObject({ ok: 1, notOk: 1, notMeasurable: 1, pct: 50 });
+    const planned = plannedIndex([["inbound", "I1", "2026-04-02", 2], ["inbound", "I2", "2026-04-02", 2]]);
+    const { rides } = materializeRides(units, { planned });
+    const r = computeInboundStocked(buildContext(units, months(["2026-04"]), {}, rides));
+    expect(r).toMatchObject({ ok: 1, notOk: 1, pct: 50, withinOneWorkday: { ok: 2, notOk: 0, pct: 100 } });
+  });
+
+  it("is not measurable without ride lists", () => {
+    const r = computeInboundStocked(ctx([unit({ inkomendeRit: "I1", inslag: "2026-04-02" })], ["2026-04"]));
+    expect(r).toMatchObject({ pct: null, notMeasurable: 1 });
   });
 });
 
