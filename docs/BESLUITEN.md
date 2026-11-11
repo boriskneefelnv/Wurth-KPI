@@ -112,6 +112,18 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B59 | Alleen periodes die aansluiten (maximaal 2% verschil) zijn kiesbaar; de rest wordt met reden genoemd. Aansluiting = gescande pallets tegenover alle units die gescand hadden moeten zijn (meegetelde ritten plus afgeronde ritten zonder scans). |
 | B60 | Export: HTML-bestand met alle slides (los te openen, logo's ingebed) en afdrukken als PDF (één slide per pagina, 1280 × 720). |
 
+## Huisstijl en presentatie (terug naar de stijl van de Lovable-module)
+
+| # | Besluit |
+|---|---|
+| B61 | Slides gebruiken weer de opmaak van de oorspronkelijke Würth-module: lichtblauw canvas #DDE9F4, containerstrook van 92 px met blauwe lijn, wit titelblok met grote blauwe titel, Neele-Vat-logo rechtsboven, witte kaarten met zachte schaduw, grote kerncijfers (44 px) met accentstreepje. Vervangt de opmaak uit B48. Rekenlogica blijft de nieuwe. |
+| B62 | Slides zijn React-componenten (`src/deck/`). Dezelfde componenten worden gebruikt voor presenteren, voorbeeld, HTML-export en PDF (statische render). |
+| B63 | Animaties als in de oude module: staven groeien (500 ms, 60 ms na elkaar), cijfers tellen op (800 ms), kaarten en labels faden in. Alleen in de presentatie; voorbeeld, export en afdruk tonen altijd de eindstand. Navigeren wacht nooit op een animatie. |
+| B64 | Presentatiemodus: volledig scherm, ← → spatie PageUp/PageDown, Home/End, 1–9, G overzicht, F volledig scherm, Esc. Knoppen verdwijnen na 2,5 s stilstand. De HTML-export kan zichzelf ook presenteren. |
+| B65 | Volumeslide: vier kerncijfers (HU's en ritten, in en uit) met de hoofdvergelijking als groene of grijze pill en de andere vergelijking als grijze tekst; grafiek met inbound (donker) en outbound (licht) per periode; vergelijkingsperiode als fijne markering op elke staaf. Kernboodschap als ondertitel. |
+| B66 | Deck nu: cover, sectie 01 Workload, vier volumeslides, afsluiting. Volgende slides worden één voor één toegevoegd. |
+| B67 | Beeldmateriaal (headerstrook, logo's, coverfoto) komt uit de oude repo, die al openbaar is, en staat nu in `public/brand/` zodat localdeploy het meeneemt. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

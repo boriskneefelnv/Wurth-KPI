@@ -27,9 +27,10 @@ import { enrichWms } from "../src/core/wms/enrich";
 import { coverageFromRideLists, indexPlannedRides, parseRideList } from "../src/core/wms/rideLists";
 import { materializeRides } from "../src/core/wms/rides";
 import { readXlsx } from "../src/core/wms/xlsxReader";
-import { renderVolumeSlide, volumeDocument } from "../src/slides/renderVolume";
+import { buildDeck } from "../src/deck/deck";
+import { deckDocument, renderSlidesStatic } from "../src/deck/exportHtml";
 import { buildControlListXlsx, ISSUE_LABEL } from "../src/app/controlList";
-import { loadBrand } from "./lib/brand";
+import { loadDeckAssets } from "./lib/brand";
 
 const { values: args } = parseArgs({
   options: {
@@ -111,11 +112,11 @@ for (const s of subjects) {
   console.log(`            ${m.headline}`);
   if (m.subline) console.log(`            ${m.subline}`);
 }
-const brand = loadBrand();
 if (args.out) {
   mkdirSync(args.out, { recursive: true });
-  const file = join(args.out, `volume-${period.key}.html`);
-  writeFileSync(file, volumeDocument(subjects.map((s, i) => renderVolumeSlide(volumeSlide(set, s), `${i + 4} / 21`, brand)), `Volume ${period.label}`));
+  const file = join(args.out, `deck-${period.key}.html`);
+  const deck = buildDeck(set, new Date());
+  writeFileSync(file, deckDocument(renderSlidesStatic(deck, loadDeckAssets()), `QBR Würth ${period.label}`));
   console.log(`\n${file}`);
 }
 

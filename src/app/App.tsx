@@ -10,28 +10,20 @@ import {
 import { comparisonOptionsWithQuality, periodQuality, rideIssues } from "../core/report/quality";
 import { reconcileRideLists } from "../core/report/reconcile";
 import { computeReportSet } from "../core/report/report";
-import { volumeSlide, type VolumeSlideSubject } from "../core/slides/volume";
 import { coverageFromRideLists, indexPlannedRides } from "../core/wms/rideLists";
 import { materializeRides } from "../core/wms/rides";
-import { renderVolumeSlide, volumeDocument, type Brand } from "../slides/renderVolume";
+import { StaticRenderContext } from "../deck/anim";
+import { assetUrls } from "../deck/assets";
+import { buildDeck, longDate, type SlideDef } from "../deck/deck";
+import { deckDocument, inlineAssets, renderSlidesStatic } from "../deck/exportHtml";
+import { Presentation } from "../deck/Presentation";
+import { SLIDE_H, SLIDE_W } from "../deck/tokens";
 import { buildControlListXlsx } from "./controlList";
 import type { Dataset, FileInfo } from "./load";
-
-// Brand images are not in the public repository; they are inlined when present at build time.
-const brandFiles = import.meta.glob<string>("../../assets/brand/{strip.jpg,maasvlakte-blue.png}", {
-  eager: true,
-  query: "?inline",
-  import: "default",
-});
-const BRAND: Brand = {
-  strip: Object.entries(brandFiles).find(([k]) => k.endsWith("strip.jpg"))?.[1],
-  logo: Object.entries(brandFiles).find(([k]) => k.endsWith("maasvlakte-blue.png"))?.[1],
-};
 
 const KIND_LABEL: Record<ReportKind, string> = { week: "Week", month: "Maand", quarter: "Kwartaal", half: "Half jaar", year: "Jaar" };
 const COMPARISON_LABEL: Record<ComparisonKind, string> = { previous: "Vorige periode", lastYear: "Zelfde periode vorig jaar" };
 const FILE_KIND_LABEL = { units: "Unitoverzicht", "ride-list-outbound": "Te laden ritten", "ride-list-inbound": "Te lossen ritten" } as const;
-const SUBJECTS: VolumeSlideSubject[] = ["WIAG", "AWKG", "Liqui Moly", "Total"];
 
 const nl = (x: number) => x.toLocaleString("nl-NL");
 const pct = (x: number | null) => (x === null ? "" : `${(x * 100).toLocaleString("nl-NL", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`);
@@ -52,6 +44,9 @@ export function App() {
   const [kind, setKind] = useState<ReportKind>("quarter");
   const [periodKey, setPeriodKey] = useState<string>("");
   const [chosen, setChosen] = useState<ComparisonKind[]>(["previous", "lastYear"]);
+  const [meetingDate, setMeetingDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [presenting, setPresenting] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
   const workerRef = useRef<Worker | null>(null);
 
   async function load(fileList: FileList | File[]) {
@@ -112,12 +107,12 @@ export function App() {
   const usable = options.filter((o) => o.usable && chosen.includes(o.kind)).map((o) => o.kind);
   const periodOk = period && quality ? quality(period) : null;
 
-  const slides = useMemo(() => {
+  const slides: SlideDef[] = useMemo(() => {
     if (!period || !dataset || !base) return [];
     const set = computeReportSet(dataset.units, period, usable, {}, base.rides);
-    return SUBJECTS.map((s, i) => renderVolumeSlide(volumeSlide(set, s), `${i + 4} / 21`, BRAND));
+    return buildDeck(set, new Date(`${meetingDate}T12:00:00`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, dataset, base, usable.join(",")]);
+  }, [period, dataset, base, usable.join(","), meetingDate]);
 
   const monthly = useMemo(() => {
     if (!base?.coverage || !dataset) return null;
@@ -138,19 +133,33 @@ export function App() {
     download(`Controlelijst ritten ${dataRange.from} tm ${dataRange.to}.xlsx`, await buildControlListXlsx(issues), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   }
 
-  function exportHtml() {
-    if (!period) return;
-    download(`QBR Wurth volume ${period.label}.html`, volumeDocument(slides, `Volume ${period.label}`), "text/html");
+  async function standaloneDeck(): Promise<string> {
+    const assets = await inlineAssets(assetUrls(import.meta.env.BASE_URL));
+    return deckDocument(renderSlidesStatic(slides, assets), `QBR Würth ${period?.label ?? ""}`);
   }
 
-  function printSlides() {
+  async function exportHtml() {
+    if (!period) return;
+    setExporting(true);
+    try {
+      download(`QBR Wurth ${period.label}.html`, await standaloneDeck(), "text/html");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function printSlides() {
     if (!period) return;
     const w = window.open("", "_blank");
     if (!w) return;
-    w.document.write(volumeDocument(slides, `Volume ${period.label}`));
-    w.document.close();
-    w.onload = () => w.print();
-    setTimeout(() => w.print(), 600);
+    setExporting(true);
+    try {
+      w.document.write(await standaloneDeck());
+      w.document.close();
+      setTimeout(() => w.print(), 800);
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -288,20 +297,37 @@ export function App() {
       {slides.length > 0 && period && (
         <section className="panel">
           <div className="eyebrow">Stap 4</div>
-          <h2>Slides {period.label}</h2>
+          <h2>Presentatie {period.label}</h2>
           <div className="actions">
-            <button onClick={exportHtml}>HTML downloaden</button>
-            <button className="secondary" onClick={printSlides}>
+            <button onClick={() => setPresenting(0)}>Presenteren</button>
+            <button className="secondary" onClick={() => void exportHtml()} disabled={exporting}>
+              HTML downloaden
+            </button>
+            <button className="secondary" onClick={() => void printSlides()} disabled={exporting}>
               Afdrukken of PDF
             </button>
+            <label className="inline">
+              Datum presentatie
+              <input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} />
+            </label>
           </div>
+          <p className="muted note">
+            Presenteren: pijltjes of spatie om te bladeren, F volledig scherm, G overzicht, Esc sluiten. Klik op een slide om vanaf die slide te
+            presenteren. Cover: {longDate(new Date(`${meetingDate}T12:00:00`))}.
+          </p>
           <div className="slides">
-            {slides.map((html, i) => (
-              <ScaledSlide key={i} html={html} />
+            {slides.map((s, i) => (
+              <button key={s.id} className="slide-card" onClick={() => setPresenting(i)} title={`Presenteren vanaf ${s.title}`}>
+                <ScaledSlide>{s.render(i + 1, slides.length)}</ScaledSlide>
+                <span>
+                  {i + 1}. {s.title}
+                </span>
+              </button>
             ))}
           </div>
         </section>
       )}
+      {presenting !== null && slides.length > 0 && <Presentation slides={slides} start={presenting} onClose={() => setPresenting(null)} />}
     </div>
   );
 }
@@ -344,20 +370,22 @@ function FileTable({ files }: { files: FileInfo[] }) {
   );
 }
 
-/** A 1280×720 slide scaled to the available width. */
-function ScaledSlide({ html }: { html: string }) {
+/** A 1280×720 slide in its final state, scaled to the available width. */
+function ScaledSlide({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(0.3);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setScale(Math.min(1, el.clientWidth / 1280)));
+    const ro = new ResizeObserver(() => setScale(el.clientWidth / SLIDE_W));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
   return (
-    <div ref={ref} className="slide-frame" style={{ height: 720 * scale }}>
-      <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: 1280 }} dangerouslySetInnerHTML={{ __html: html }} />
+    <div ref={ref} className="slide-frame" style={{ height: SLIDE_H * scale }}>
+      <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: SLIDE_W, height: SLIDE_H }}>
+        <StaticRenderContext.Provider value={true}>{children}</StaticRenderContext.Provider>
+      </div>
     </div>
   );
 }

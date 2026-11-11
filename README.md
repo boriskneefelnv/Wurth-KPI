@@ -13,7 +13,9 @@ blijven op de eigen computer.
    maanden vóór de eerste rapportmaand), **Te laden ritten** en **Te lossen ritten**.
 2. Open de tool en sleep alle bestanden tegelijk in het venster. De tool herkent zelf welk bestand wat is.
 3. Controleer de aansluiting per maand en download zo nodig de controlelijst met afwijkende ritten.
-4. Kies de rapportsoort, periode en vergelijking. Download de slides als HTML of druk af als PDF.
+4. Kies de rapportsoort, periode en vergelijking.
+5. Klik op **Presenteren** (volledig scherm; ← → bladeren, G overzicht, Esc sluiten), of download de
+   presentatie als HTML (die zichzelf ook kan presenteren) of druk af als PDF.
 
 ### Via localdeploy
 
@@ -36,8 +38,7 @@ npm run check
 ```
 
 `check` draait de typecheck en alle tests. Echte exports horen in `data/` (staat in `.gitignore`).
-Logo en headerfoto staan in `assets/brand/` (niet in git, de repo is openbaar); zonder die bestanden
-gebruiken de slides een neutrale blauwe header en het logo als tekst.
+Beeldmateriaal voor de slides staat in `public/brand/`.
 
 ## Status
 
@@ -45,7 +46,7 @@ gebruiken de slides een neutrale blauwe header en het logo als tekst.
 |---|---|
 | Rekenkern (inlezen, verrijken, ritdatum, KPI's, klachten) + tests | klaar |
 | Rittenlijsten, aansluitcontrole, controlelijst | klaar |
-| Browser-app (localdeploy) met volumeslides, export HTML en PDF | klaar |
+| Browser-app (localdeploy), slides in de huisstijl van de Würth-module, presentatiemodus, export HTML en PDF | klaar |
 | Overige slides (on-time loading, dagvolume, container mix, opslag, kaart, profielen, voorraad, klachten) | slide voor slide |
 | Klachten (AFAS) in de app | gepland |
 
@@ -56,12 +57,12 @@ src/core/                 Pure rekenlogica (geen React/Supabase), volledig getes
   types.ts, constants.ts  Domeintypes, kolommen, kleuren, doelen, drempels
   dates.ts                Datums (wandklok), periodes, werkdagen
   wms/excel.ts            Werkblad- en kopregelselectie, verplichte kolommen
-  wms/xlsxReader.ts       .xlsx → SheetData (ExcelJS), vervangbaar
+  wms/xlsxReader.ts       .xlsx naar SheetData (ExcelJS), vervangbaar
   wms/enrich.ts           Filtering, principal, containertype, opslagbuckets
   wms/rides.ts            Canonieke ritdatum (5%-regel), ritten en zendingen
   report/                 Operationele KPI's + computeReport()
   complaints/             Matcher, classificatie, klacht-KPI
-src/slides/               Slide-opmaak (HTML, huisstijl Neele-Vat)
+src/deck/                 Slides (React), presentatiemodus, animaties, HTML-export
 src/app/                  Browser-app (React): inladen in web worker, aansluiting, rapport, export
 index.html                Ingang van de website (Vite)
 scripts/                  Analyse en preview op de commandoregel (Node)

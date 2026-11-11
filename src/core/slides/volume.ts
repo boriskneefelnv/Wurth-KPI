@@ -51,6 +51,10 @@ export interface VolumeSlideModel {
   headline: string;
   /** Supporting sentence(s): driver of the change and busiest day. */
   subline: string | null;
+  /** Context for the headline (missing comparison volume, driver of the change), without the busiest day. */
+  context: string | null;
+  /** "Busiest day was …" sentence. */
+  peak: string | null;
 }
 
 const SUBJECT_KEY: Record<VolumeSlideSubject, SeriesKey> = {
@@ -140,7 +144,12 @@ function principalDriver(set: ReportSet, comparison: OperationalReport): { princ
  * when that has volume, else the previous period); without comparison the
  * totals. Subline: what drives the outbound change, and the busiest day.
  */
-function texts(set: ReportSet, key: SeriesKey, inbound: VolumePanel, outbound: VolumePanel): { headline: string; subline: string | null } {
+function texts(
+  set: ReportSet,
+  key: SeriesKey,
+  inbound: VolumePanel,
+  outbound: VolumePanel,
+): { headline: string; subline: string | null; context: string | null; peak: string | null } {
   const extra: string[] = [];
   const has = (kind: string) =>
     [inbound, outbound].some((p) => p.comparisons.find((c) => c.kind === kind)?.husDeltaPct != null);
@@ -183,11 +192,13 @@ function texts(set: ReportSet, key: SeriesKey, inbound: VolumePanel, outbound: V
   } else {
     headline = `${plural(outbound.totalHus, "HU", "HUs")} out on ${plural(outbound.totalRides, "ride", "rides")}, ${plural(inbound.totalHus, "HU", "HUs")} in on ${plural(inbound.totalRides, "ride", "rides")}.`;
   }
-  const peak = [inbound, outbound].filter((p) => p.peakDay).sort((a, b) => b.peakDay!.hus - a.peakDay!.hus)[0];
-  if (peak?.peakDay) {
-    extra.push(`Busiest day was ${fmtDay(peak.peakDay.day)} with ${plural(peak.peakDay.hus, "HU", "HUs")} ${peak.direction === "inbound" ? "in" : "out"}.`);
-  }
-  return { headline, subline: extra.length ? extra.join(" ") : null };
+  const context = extra.length ? extra.join(" ") : null;
+  const busiest = [inbound, outbound].filter((p) => p.peakDay).sort((a, b) => b.peakDay!.hus - a.peakDay!.hus)[0];
+  const peak = busiest?.peakDay
+    ? `Busiest day was ${fmtDay(busiest.peakDay.day)} with ${plural(busiest.peakDay.hus, "HU", "HUs")} ${busiest.direction === "inbound" ? "in" : "out"}.`
+    : null;
+  const subline = [context, peak].filter(Boolean).join(" ") || null;
+  return { headline, subline, context, peak };
 }
 
 export function volumeSlide(set: ReportSet, subject: VolumeSlideSubject): VolumeSlideModel {
