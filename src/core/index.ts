@@ -25,3 +25,7 @@ export * from "./complaints/types";
 export * from "./complaints/classify";
 export * from "./complaints/matcher";
 export * from "./complaints/kpi";
+
+export * from "./period";
+export * from "./report/reconcile";
+export * from "./slides/volume";

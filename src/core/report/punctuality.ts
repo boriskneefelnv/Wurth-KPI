@@ -1,5 +1,6 @@
 import { TARGETS } from "../constants";
 import { dayKey } from "../dates";
+import { bucketIndex } from "../period";
 import type { DayKey, MainPrincipal, Period, Principal } from "../types";
 import { MAIN_PRINCIPALS } from "../types";
 import { dominantPrincipal, pct, selectedRides, type ReportContext } from "./context";
@@ -17,7 +18,8 @@ export interface PunctualityResult extends PunctualityCounts {
   /** Rides in scope that lack the dates to be measured. */
   notMeasurable: number;
   perPrincipal: Record<MainPrincipal, PunctualityCounts>;
-  perPeriod: ({ period: Period } & PunctualityCounts)[];
+  /** Per bucket of the period (day, week or month), by the ride's canonical day. */
+  perBucket: ({ key: string; label: string } & PunctualityCounts)[];
   /** Rides that failed the rule, for drill-down. */
   exceptions: { ritNummer: string; principal: Principal; period: Period; actual: DayKey; planned: DayKey }[];
 }
@@ -33,7 +35,7 @@ function aggregate(
   const zero = (): PunctualityCounts => ({ ok: 0, notOk: 0, pct: null });
   const total = zero();
   const perPrincipal = Object.fromEntries(MAIN_PRINCIPALS.map((p) => [p, zero()])) as Record<MainPrincipal, PunctualityCounts>;
-  const perPeriod = new Map(ctx.selected.map((p) => [p, zero()]));
+  const perBucket = ctx.buckets.map(zero);
   const exceptions: PunctualityResult["exceptions"] = [];
   let notMeasurable = 0;
 
@@ -44,7 +46,9 @@ function aggregate(
       continue;
     }
     const principal = dominantPrincipal(ride);
-    const buckets = [total, perPeriod.get(ride.period)!];
+    const buckets = [total];
+    const bi = bucketIndex(ctx.buckets, ride.canonicalDate);
+    if (bi !== -1) buckets.push(perBucket[bi]!);
     if ((MAIN_PRINCIPALS as readonly string[]).includes(principal)) buckets.push(perPrincipal[principal as MainPrincipal]);
     for (const b of buckets) outcome.ok ? b.ok++ : b.notOk++;
     if (!outcome.ok) {
@@ -57,7 +61,7 @@ function aggregate(
   };
   finish(total);
   Object.values(perPrincipal).forEach(finish);
-  perPeriod.forEach(finish);
+  perBucket.forEach(finish);
 
   return {
     ...total,
@@ -65,7 +69,7 @@ function aggregate(
     meetsTarget: total.pct === null ? null : total.ok / (total.ok + total.notOk) >= target / 100,
     notMeasurable,
     perPrincipal,
-    perPeriod: [...perPeriod].map(([period, c]) => ({ period, ...c })),
+    perBucket: perBucket.map((c, i) => ({ key: ctx.buckets[i]!.key, label: ctx.buckets[i]!.label, ...c })),
     exceptions: exceptions.sort((a, b) => a.actual.localeCompare(b.actual)),
   };
 }

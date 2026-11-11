@@ -4,7 +4,7 @@ import { inc, selectedRides, type ReportContext } from "./context";
 
 export interface CountryStats {
   country: string;
-  /** Distinct selected outbound rides delivering (partly) to this country. */
+  /** Distinct outbound rides in the period delivering (partly) to this country. */
   rides: number;
   hus: number;
   kg: number;
@@ -14,12 +14,12 @@ export interface CountryStats {
 }
 
 export interface OutboundBlock {
-  /** Outbound HUs whose outbound date falls in a selected month. */
+  /** Outbound HUs whose outbound date falls in the period. */
   totalHus: number;
   totalKg: number;
-  /** Outbound rides whose canonical day falls in a selected month. */
+  /** Outbound rides whose canonical day falls in the period. */
   rides: number;
-  /** Average HUs per selected ride (all HUs of those rides). */
+  /** Average HUs per ride (all HUs of those rides). */
   avgHusPerRide: number | null;
   /** Sorted by rides desc, then HUs desc. */
   countries: CountryStats[];
@@ -38,7 +38,7 @@ export function computeOutbound(ctx: ReportContext): OutboundBlock {
   let totalHus = 0;
   let totalKg = 0;
   for (const u of ctx.units) {
-    if (!u.outboundPeriod || !ctx.selectedSet.has(u.outboundPeriod)) continue;
+    if (!ctx.inPeriod(u.uitslagUnit)) continue;
     totalHus++;
     totalKg += u.brutoKg;
     const c = country(u.losLand ?? "Onbekend");
@@ -82,7 +82,7 @@ export function computeOutbound(ctx: ReportContext): OutboundBlock {
 export function principalCountryHus(ctx: ReportContext, principal: Principal): Map<string, number> {
   const m = new Map<string, number>();
   for (const u of ctx.units) {
-    if (u.principal !== principal || !u.outboundPeriod || !ctx.selectedSet.has(u.outboundPeriod)) continue;
+    if (u.principal !== principal || !ctx.inPeriod(u.uitslagUnit)) continue;
     inc(m, u.losLand ?? "Onbekend");
   }
   return m;

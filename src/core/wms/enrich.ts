@@ -99,6 +99,10 @@ export interface RejectedRow {
   rowIndex: number;
   reason: RejectReason;
   detail: string;
+  /** Parsed dates and client of the rejected row, for reconciliation per period. */
+  inslagUnit: Date | null;
+  uitslagUnit: Date | null;
+  opdrachtgever: string;
 }
 
 export interface EnrichValidation {
@@ -166,18 +170,6 @@ export function enrichWms(parsed: ParsedWms, options: EnrichOptions = {}): Enric
 }
 
 function enrichRow(row: RawWmsRow, map: Readonly<Record<string, Principal>>, v: EnrichValidation): WmsUnit | null {
-  const reject = (reason: RejectReason, detail: string) => {
-    v.rejected.push({ rowIndex: row.__rowIndex, reason, detail });
-    return null;
-  };
-
-  const omschrijving = str(row["Omschrijving"]);
-  if (isExcludedStatus(omschrijving)) {
-    const s = normalizeStatus(omschrijving);
-    v.excludedStatuses[s] = (v.excludedStatuses[s] ?? 0) + 1;
-    return reject("status", omschrijving);
-  }
-
   const dates: Record<(typeof DATE_COLUMNS)[number][1], Date | null> = {
     laaddatum: null,
     inslagUnit: null,
@@ -193,6 +185,26 @@ function enrichRow(row: RawWmsRow, map: Readonly<Record<string, Principal>>, v: 
     if (d === null && raw !== null && raw !== undefined && str(raw) !== "") badDates.push(col);
   }
 
+  const opdrachtgever = str(row["Opdrachtgever"]);
+  const reject = (reason: RejectReason, detail: string) => {
+    v.rejected.push({
+      rowIndex: row.__rowIndex,
+      reason,
+      detail,
+      inslagUnit: dates.inslagUnit,
+      uitslagUnit: dates.uitslagUnit,
+      opdrachtgever,
+    });
+    return null;
+  };
+
+  const omschrijving = str(row["Omschrijving"]);
+  if (isExcludedStatus(omschrijving)) {
+    const s = normalizeStatus(omschrijving);
+    v.excludedStatuses[s] = (v.excludedStatuses[s] ?? 0) + 1;
+    return reject("status", omschrijving);
+  }
+
   if (!dates.inslagUnit && !dates.uitslagUnit) return reject("no-dates", "Inslag en uitslag leeg");
 
   const dagenRaw = parseNumber(row["Dagen in opslag"]);
@@ -203,7 +215,6 @@ function enrichRow(row: RawWmsRow, map: Readonly<Record<string, Principal>>, v: 
 
   for (const col of badDates) v.unparseableDates[col] = (v.unparseableDates[col] ?? 0) + 1;
 
-  const opdrachtgever = str(row["Opdrachtgever"]);
   let principal = map[normalizeOpdrachtgever(opdrachtgever)];
   if (!principal) {
     const key = opdrachtgever || "(leeg)";

@@ -9,9 +9,10 @@ en zendingen, berekent de operationele en klacht-KPI's en maakt de QBR-presentat
 | Fase | Inhoud | Status |
 |---|---|---|
 | 1 | **Rekenkern + tests**: Excel inlezen, verrijken, ritdatum (5%-regel), alle KPI's, klachtenmatcher, klacht-KPI | ✅ klaar |
-| 2 | Supabase: één schone migratie, import in één transactie, RLS | gepland |
-| 3 | App (Vite + React + TypeScript): één workflow import → controle → klachten → rapport | gepland |
-| 4 | QBR-deck (21 slides, 1280×720, Neele-Vat-stijl) + export naar HTML, PDF en PPTX | gepland |
+| 2 | Slides één voor één uitwerken (volume ✅ rekenmodel, preview: `npx tsx scripts/preview-volume.ts <map>`) | bezig |
+| 3 | Supabase: één schone migratie, import in één transactie, RLS | gepland |
+| 4 | App (Vite + React + TypeScript): één workflow import → controle → klachten → rapport | gepland |
+| 5 | QBR-deck (21 slides, 1280×720, Neele-Vat-stijl) + export naar HTML, PDF en PPTX | gepland |
 
 ## Structuur
 

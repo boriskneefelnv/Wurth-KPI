@@ -1,6 +1,4 @@
-import { INCOMPLETE_MONTH_SHARE } from "../constants";
-import { periodLabelEn } from "../dates";
-import type { MainPrincipal, Period } from "../types";
+import type { MainPrincipal } from "../types";
 import { MAIN_PRINCIPALS } from "../types";
 import type { ReportContext } from "./context";
 import { mean } from "./context";
@@ -39,24 +37,9 @@ const VOLUME_SLIDE: Record<MainPrincipal, SlideId> = {
 const fmtPct = (x: number) => `${x >= 0 ? "+" : ""}${x.toFixed(0)}%`;
 
 /**
- * Months whose outbound HU volume is below 25% of the mean of the other
- * selected months (typically a month that is still running).
- */
-export function incompleteMonths(volume: VolumeBlock): Set<Period> {
-  const out = new Set<Period>();
-  if (volume.granularity !== "month") return out;
-  const totals = volume.outbound.Total.buckets;
-  volume.buckets.forEach((b, i) => {
-    const others = totals.filter((_, j) => j !== i);
-    const m = mean(others);
-    if (m !== null && m > 0 && totals[i]! < INCOMPLETE_MONTH_SHARE * m) out.add(b.key);
-  });
-  return out;
-}
-
-/**
- * Scored, automatically generated takeaways (HU perspective). Requires at
- * least two selected months; returns them sorted by score, highest first.
+ * Scored, automatically generated takeaways (HU perspective), sorted by score.
+ * Trend rules compare the last two buckets of the period (days, weeks or months).
+ * NOTE: to be revisited once comparisons with previous periods are on the slides.
  */
 export function computeInsights(
   ctx: ReportContext,
@@ -68,13 +51,11 @@ export function computeInsights(
     avgHusPerRide: number | null;
   },
 ): Insight[] {
-  if (ctx.selected.length < 2) return [];
   const insights: Insight[] = [];
   const { volumeHus: vol } = input;
-  const incomplete = incompleteMonths(vol);
-  const completeIdx = vol.buckets.map((b, i) => (incomplete.has(b.key) ? -1 : i)).filter((i) => i >= 0);
+  const completeIdx = vol.buckets.map((_, i) => i);
 
-  // 1. Principal outbound month-over-month (last two complete months)
+  // 1. Principal outbound change between the last two buckets
   if (completeIdx.length >= 2) {
     const [a, b] = completeIdx.slice(-2) as [number, number];
     for (const p of MAIN_PRINCIPALS) {
@@ -85,7 +66,7 @@ export function computeInsights(
       if (Math.abs(deltaPct) < 10) continue;
       insights.push({
         kind: "principal-mom",
-        text: `${p} outbound volume ${deltaPct > 0 ? "rose" : "fell"} ${fmtPct(deltaPct)} from ${periodLabelEn(vol.buckets[a]!.key)} to ${periodLabelEn(vol.buckets[b]!.key)} (${prev.toLocaleString("en-GB")} → ${cur.toLocaleString("en-GB")} HUs).`,
+        text: `${p} outbound volume ${deltaPct > 0 ? "rose" : "fell"} ${fmtPct(deltaPct)} from ${vol.buckets[a]!.label} to ${vol.buckets[b]!.label} (${prev.toLocaleString("en-GB")} → ${cur.toLocaleString("en-GB")} HUs).`,
         score: Math.abs(deltaPct) * Math.sqrt(cur),
         slide: VOLUME_SLIDE[p],
       });
@@ -125,7 +106,7 @@ export function computeInsights(
     }
   }
 
-  // 4. Peak month (outbound total)
+  // 4. Peak bucket (outbound total)
   const complete = completeIdx.map((i) => vol.outbound.Total.buckets[i]!);
   const m = mean(complete);
   if (m && complete.length >= 2) {
@@ -135,7 +116,7 @@ export function computeInsights(
     if (pctAbove >= 30) {
       insights.push({
         kind: "peak-month",
-        text: `${periodLabelEn(vol.buckets[peakIdx]!.key)} was the peak month with ${peak.toLocaleString("en-GB")} outbound HUs, ${pctAbove.toFixed(0)}% above the average month.`,
+        text: `${vol.buckets[peakIdx]!.label} was the busiest with ${peak.toLocaleString("en-GB")} outbound HUs, ${pctAbove.toFixed(0)}% above average.`,
         score: pctAbove * 2,
         slide: "volume-total",
       });
@@ -158,20 +139,17 @@ export function computeInsights(
     }
   }
 
-  // 6. Stock trend (month-over-month)
-  const { delta, endOfPeriod } = input.stock;
-  if (delta && endOfPeriod) {
-    const start = endOfPeriod.total - delta.total;
-    if (start > 0) {
-      const deltaPct = (delta.total / start) * 100;
-      if (Math.abs(deltaPct) >= 5) {
-        insights.push({
-          kind: "stock-trend",
-          text: `Stock ${deltaPct > 0 ? "grew" : "decreased"} ${fmtPct(deltaPct)} month-over-month, from ${start.toLocaleString("en-GB")} HUs at the end of ${periodLabelEn(delta.from)} to ${endOfPeriod.total.toLocaleString("en-GB")} at the end of ${periodLabelEn(delta.to)}.`,
-          score: Math.abs(deltaPct) * Math.sqrt(endOfPeriod.total || 1),
-          slide: "stock",
-        });
-      }
+  // 6. Stock trend over the period
+  const { delta, startOfPeriod, endOfPeriod } = input.stock;
+  if (delta && startOfPeriod.total > 0) {
+    const deltaPct = (delta.total / startOfPeriod.total) * 100;
+    if (Math.abs(deltaPct) >= 5) {
+      insights.push({
+        kind: "stock-trend",
+        text: `Stock ${deltaPct > 0 ? "grew" : "decreased"} ${fmtPct(deltaPct)} during ${ctx.period.label}, from ${startOfPeriod.total.toLocaleString("en-GB")} to ${endOfPeriod.total.toLocaleString("en-GB")} HUs.`,
+        score: Math.abs(deltaPct) * Math.sqrt(endOfPeriod.total || 1),
+        slide: "stock",
+      });
     }
   }
 

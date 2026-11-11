@@ -1,6 +1,7 @@
-import { dayKey, parsePeriod, sortPeriods, wallClock, isoWeekday, daysInPeriod } from "../dates";
+import { dayKey } from "../dates";
+import { bucketsFor, inRange, workdaysInRange, type ReportPeriod, type TrendBucket } from "../period";
 import { indexRides, materializeRides, rideOf, type RideIndex } from "../wms/rides";
-import type { DayKey, Direction, Period, Principal, Ride, WmsUnit } from "../types";
+import type { DayKey, Direction, Principal, Ride, WmsUnit } from "../types";
 
 export interface ReportOptions {
   /** Days that do not count as workdays (YYYY-MM-DD). Default: none. */
@@ -12,24 +13,26 @@ export interface ReportOptions {
   onTimeRule?: "earliest" | "latest";
 }
 
-/** Everything the KPI functions need, computed once. */
+/** Everything the KPI functions need for one period, computed once. */
 export interface ReportContext {
   units: readonly WmsUnit[];
-  selected: Period[];
-  selectedSet: ReadonlySet<Period>;
+  period: ReportPeriod;
+  buckets: TrendBucket[];
+  workdays: number;
   rides: RideIndex;
   unitsByRide: Record<Direction, Map<string, WmsUnit[]>>;
   holidays: ReadonlySet<DayKey>;
   options: Required<Omit<ReportOptions, "holidays">>;
+  /** True when the (wall-clock) date falls inside the report period. */
+  inPeriod(d: Date | null): boolean;
 }
 
 export function buildContext(
   units: readonly WmsUnit[],
-  selectedPeriods: Iterable<Period>,
+  period: ReportPeriod,
   options: ReportOptions = {},
   rides?: readonly Ride[],
 ): ReportContext {
-  const selected = sortPeriods(selectedPeriods);
   const unitsByRide: ReportContext["unitsByRide"] = { inbound: new Map(), outbound: new Map() };
   for (const direction of ["inbound", "outbound"] as const) {
     for (const u of units) {
@@ -40,20 +43,23 @@ export function buildContext(
       list.push(u);
     }
   }
+  const holidays = new Set(options.holidays ?? []);
   return {
     units,
-    selected,
-    selectedSet: new Set(selected),
+    period,
+    buckets: bucketsFor(period),
+    workdays: workdaysInRange(period, holidays),
     rides: indexRides(rides ?? materializeRides(units).rides),
     unitsByRide,
-    holidays: new Set(options.holidays ?? []),
+    holidays,
     options: { onTimeRule: options.onTimeRule ?? "earliest" },
+    inPeriod: (d) => d !== null && inRange(dayKey(d), period),
   };
 }
 
-/** Rides of a direction whose canonical period is selected. */
+/** Rides of a direction whose canonical day falls in the report period. */
 export function selectedRides(ctx: ReportContext, direction: Direction): Ride[] {
-  return [...ctx.rides[direction].values()].filter((r) => ctx.selectedSet.has(r.period));
+  return [...ctx.rides[direction].values()].filter((r) => inRange(r.canonicalDate, ctx.period));
 }
 
 export function dominantPrincipal(ride: Ride): Principal {
@@ -90,51 +96,13 @@ export function pct(part: number, whole: number): number | null {
   return whole > 0 ? (part / whole) * 100 : null;
 }
 
+/** Relative change in % or null when the baseline is 0. */
+export function deltaPct(current: number, baseline: number): number | null {
+  return baseline > 0 ? ((current - baseline) / baseline) * 100 : null;
+}
+
 export function inc<K>(m: Map<K, number>, k: K, by = 1) {
   m.set(k, (m.get(k) ?? 0) + by);
 }
 
-// ---------------------------------------------------------------------------
-// Trend buckets
-// ---------------------------------------------------------------------------
-
-export interface TrendBucket {
-  key: string;
-  label: string;
-  /** Inclusive first day. */
-  from: DayKey;
-  /** Inclusive last day. */
-  to: DayKey;
-}
-
-/**
- * One selected month → Monday-based weeks clipped to the month ("Week 1", …).
- * Several months → one bucket per month.
- */
-export function trendBuckets(selected: readonly Period[]): TrendBucket[] {
-  if (selected.length === 1) {
-    const p = selected[0]!;
-    const { year, month } = parsePeriod(p);
-    const buckets: TrendBucket[] = [];
-    const days = daysInPeriod(p);
-    for (let day = 1; day <= days; day++) {
-      const d = wallClock(year, month, day);
-      if (day === 1 || isoWeekday(d) === 1) {
-        buckets.push({ key: `${p}-W${buckets.length + 1}`, label: `Week ${buckets.length + 1}`, from: dayKey(d), to: dayKey(d) });
-      } else {
-        buckets[buckets.length - 1]!.to = dayKey(d);
-      }
-    }
-    return buckets;
-  }
-  return selected.map((p) => ({ key: p, label: p, from: `${p}-01`, to: `${p}-${String(daysInPeriod(p)).padStart(2, "0")}` }));
-}
-
-/** Index of the bucket containing the day, or -1. */
-export function bucketIndex(buckets: readonly TrendBucket[], day: DayKey): number {
-  for (let i = 0; i < buckets.length; i++) {
-    const b = buckets[i]!;
-    if (day >= b.from && day <= b.to) return i;
-  }
-  return -1;
-}
+export type { TrendBucket };

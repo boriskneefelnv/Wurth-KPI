@@ -112,8 +112,6 @@ export const STORAGE_TOP = {
 export const DESTINATIONS_TOP_N = 10;
 export const SANKEY_TOP_COUNTRIES = 8;
 
-/** A month counts as incomplete when its outbound volume is below this share of the other months' mean. */
-export const INCOMPLETE_MONTH_SHARE = 0.25;
 
 /** Share of dated HUs (from the newest day backwards) that fixes a ride's canonical day. */
 export const RIDE_DATE_THRESHOLD = 0.05;

@@ -1,9 +1,10 @@
 import { DESTINATIONS_TOP_N } from "../constants";
-import { dayKey, workdaysInPeriods } from "../dates";
+import { dayKey } from "../dates";
+import { bucketIndex, type TrendBucket } from "../period";
 import { directionalDate } from "../wms/rides";
-import type { Direction, KnownShipmentType, Perspective, Principal, ShipmentType, WmsUnit } from "../types";
+import type { DayKey, Direction, KnownShipmentType, Perspective, Principal, ShipmentType, WmsUnit } from "../types";
 import { KNOWN_SHIPMENT_TYPES, PRINCIPALS } from "../types";
-import { bucketIndex, inc, selectedRides, trendBuckets, type ReportContext, type TrendBucket } from "./context";
+import { inc, selectedRides, type ReportContext } from "./context";
 
 // ---------------------------------------------------------------------------
 // Volume
@@ -12,80 +13,85 @@ import { bucketIndex, inc, selectedRides, trendBuckets, type ReportContext, type
 export type SeriesKey = Principal | "Total";
 
 export interface VolumeSeries {
+  /** Value per bucket (day, week or month, see VolumeBlock.buckets). */
   buckets: number[];
   total: number;
-  /** Buckets (weeks or months) with a positive value. */
-  activeBuckets: number;
-  /** Total / active months. Null in single-month (weekly) mode. */
-  avgPerMonth: number | null;
+  /** Total / number of buckets (the period is fully covered, so empty buckets are real zeros). */
+  avgPerBucket: number;
+  /** Total / workdays in the period. */
   avgPerWorkday: number | null;
+  /** Bucket with the highest value (first one on ties). */
   peak: { label: string; value: number } | null;
+  /** Busiest single day. */
+  peakDay: { day: DayKey; value: number } | null;
 }
 
 export interface VolumeBlock {
   perspective: Perspective;
-  granularity: "week" | "month";
   buckets: TrendBucket[];
   inbound: Record<SeriesKey, VolumeSeries>;
   outbound: Record<SeriesKey, VolumeSeries>;
 }
 
-function series(values: number[], buckets: TrendBucket[], monthly: boolean, workdays: number): VolumeSeries {
+function series(values: number[], perDay: Map<DayKey, number>, buckets: TrendBucket[], workdays: number): VolumeSeries {
   const total = values.reduce((a, b) => a + b, 0);
-  const activeBuckets = values.filter((v) => v > 0).length;
   let peak: VolumeSeries["peak"] = null;
   values.forEach((v, i) => {
     if (v > 0 && (!peak || v > peak.value)) peak = { label: buckets[i]!.label, value: v };
   });
+  let peakDay: VolumeSeries["peakDay"] = null;
+  for (const [day, value] of [...perDay].sort(([a], [b]) => a.localeCompare(b))) {
+    if (!peakDay || value > peakDay.value) peakDay = { day, value };
+  }
   return {
     buckets: values,
     total,
-    activeBuckets,
-    avgPerMonth: monthly ? (activeBuckets > 0 ? total / activeBuckets : 0) : null,
+    avgPerBucket: buckets.length ? total / buckets.length : 0,
     avgPerWorkday: workdays > 0 ? total / workdays : null,
     peak,
+    peakDay,
   };
 }
 
 const SERIES_KEYS: SeriesKey[] = [...PRINCIPALS, "Total"];
 
+/**
+ * Inbound/outbound volume per bucket and principal.
+ * HUs: by Inslag Unit / Uitslag Unit. Rides: each ride once, on its canonical
+ * day (5% rule); a ride with several principals counts for each of them, but
+ * once in the total.
+ */
 export function computeVolume(ctx: ReportContext, perspective: Perspective): VolumeBlock {
-  const buckets = trendBuckets(ctx.selected);
-  const monthly = ctx.selected.length > 1;
-  const workdays = workdaysInPeriods(ctx.selected, ctx.holidays);
+  const { buckets } = ctx;
 
   const block = (direction: Direction): Record<SeriesKey, VolumeSeries> => {
     const values = Object.fromEntries(SERIES_KEYS.map((k) => [k, buckets.map(() => 0)])) as Record<SeriesKey, number[]>;
+    const perDay = Object.fromEntries(SERIES_KEYS.map((k) => [k, new Map<DayKey, number>()])) as Record<
+      SeriesKey,
+      Map<DayKey, number>
+    >;
+    const add = (keys: SeriesKey[], day: DayKey) => {
+      const i = bucketIndex(buckets, day);
+      if (i === -1) return;
+      for (const k of keys) {
+        values[k][i]!++;
+        inc(perDay[k], day);
+      }
+    };
     if (perspective === "hus") {
       for (const u of ctx.units) {
         const d = directionalDate(u, direction);
-        if (!d) continue;
-        const i = bucketIndex(buckets, dayKey(d));
-        if (i === -1) continue;
-        values[u.principal][i]!++;
-        values.Total[i]!++;
+        if (d) add([u.principal, "Total"], dayKey(d));
       }
     } else {
-      // Each ride counts once, on its canonical day.
-      for (const ride of selectedRides(ctx, direction)) {
-        const i = bucketIndex(buckets, ride.canonicalDate);
-        if (i === -1) continue;
-        for (const p of ride.principals) values[p][i]!++;
-        values.Total[i]!++;
-      }
+      for (const ride of selectedRides(ctx, direction)) add([...ride.principals, "Total"], ride.canonicalDate);
     }
     return Object.fromEntries(
-      SERIES_KEYS.map((k) => [k, series(values[k], buckets, monthly, workdays)]),
+      SERIES_KEYS.map((k) => [k, series(values[k], perDay[k], buckets, ctx.workdays)]),
     ) as Record<SeriesKey, VolumeSeries>;
   };
 
-  return {
-    perspective,
-    granularity: monthly ? "month" : "week",
-    buckets,
-    inbound: block("inbound"),
-    outbound: block("outbound"),
-  };
+  return { perspective, buckets, inbound: block("inbound"), outbound: block("outbound") };
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +145,7 @@ export function computeContainerMix(ctx: ReportContext, perspective: Perspective
 
   if (perspective === "hus") {
     for (const u of ctx.units) {
-      if (!u.outboundPeriod || !ctx.selectedSet.has(u.outboundPeriod)) continue;
+      if (!ctx.inPeriod(u.uitslagUnit)) continue;
       const t = u.shipmentType ?? "Onbekend";
       total[t]++;
       per[u.principal][t]++;
@@ -190,7 +196,7 @@ export function computeDestinations(ctx: ReportContext, perspective: Perspective
 
   if (perspective === "hus") {
     for (const u of ctx.units) {
-      if (!u.outboundPeriod || !ctx.selectedSet.has(u.outboundPeriod)) continue;
+      if (!ctx.inPeriod(u.uitslagUnit)) continue;
       const r = row(u.losLand ?? "Onbekend");
       r.total++;
       r.perPrincipal[u.principal]++;

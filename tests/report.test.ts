@@ -1,6 +1,5 @@
 import { buildContext } from "@/core/report/context";
 import { computeDailyVolume } from "@/core/report/daily";
-import { incompleteMonths } from "@/core/report/insights";
 import { computeOutbound } from "@/core/report/outbound";
 import { classifyProfile, computeFlow } from "@/core/report/profiles";
 import { computeInboundStocked, computeOnTimeLoading } from "@/core/report/punctuality";
@@ -9,9 +8,14 @@ import { computeStock } from "@/core/report/stock";
 import { computeStorage, computeStorageTop } from "@/core/report/storage";
 import { computeContainerMix, computeDestinations, computeVolume } from "@/core/report/workload";
 import type { WmsUnit } from "@/core/types";
+import { customPeriod, makePeriod, type ReportPeriod } from "@/core/period";
+import { periodEnd } from "@/core/dates";
 import { times, unit } from "./fixtures";
 
-const ctx = (units: WmsUnit[], periods: string[], opts = {}) => buildContext(units, periods, opts);
+/** One month → month report; several months → custom range with monthly bars. */
+const months = (ms: string[]): ReportPeriod =>
+  ms.length === 1 ? makePeriod("month", ms[0]!) : customPeriod(`${ms[0]}-01`, periodEnd(ms[ms.length - 1]!).toISOString().slice(0, 10));
+const ctx = (units: WmsUnit[], periods: string[], opts = {}) => buildContext(units, months(periods), opts);
 
 describe("volume", () => {
   const units = [
@@ -26,11 +30,12 @@ describe("volume", () => {
 
   it("counts HUs per month and principal", () => {
     const v = computeVolume(ctx(units, ["2026-03", "2026-04"]), "hus");
-    expect(v.granularity).toBe("month");
+    expect(v.buckets.map((b) => b.label)).toEqual(["Mar", "Apr"]);
     expect(v.outbound.WIAG.buckets).toEqual([2, 3]);
     expect(v.outbound.AWKG.buckets).toEqual([0, 1]);
-    expect(v.outbound.Total).toMatchObject({ buckets: [2, 4], total: 6, activeBuckets: 2, avgPerMonth: 3 });
-    expect(v.outbound.Total.peak).toEqual({ label: "2026-04", value: 4 });
+    expect(v.outbound.Total).toMatchObject({ buckets: [2, 4], total: 6, avgPerBucket: 3 });
+    expect(v.outbound.Total.peak).toEqual({ label: "Apr", value: 4 });
+    expect(v.outbound.Total.peakDay).toEqual({ day: "2026-04-02", value: 4 });
     expect(v.inbound["Liqui Moly"].total).toBe(1);
     // 22 workdays in March 2026 + 22 in April 2026
     expect(v.outbound.Total.avgPerWorkday).toBeCloseTo(6 / 44);
@@ -43,11 +48,11 @@ describe("volume", () => {
     expect(v.outbound.AWKG.buckets).toEqual([0, 1]);
   });
 
-  it("uses weekly buckets for a single month and has no monthly average", () => {
+  it("uses ISO-week buckets for a month report; empty weeks count in the average", () => {
     const v = computeVolume(ctx(units, ["2026-04"]), "hus");
-    expect(v.granularity).toBe("week");
+    expect(v.buckets.map((b) => b.label)).toEqual(["Wk 14", "Wk 15", "Wk 16", "Wk 17", "Wk 18"]);
     expect(v.outbound.Total.buckets).toEqual([4, 0, 0, 0, 0]);
-    expect(v.outbound.Total.avgPerMonth).toBeNull();
+    expect(v.outbound.Total.avgPerBucket).toBe(0.8);
   });
 });
 
@@ -181,23 +186,24 @@ describe("stock", () => {
     unit({ inslag: "2026-04-02", uitslag: "2026-04-03" }),
   ];
 
-  it("month-end snapshots for the selected months and a MoM delta", () => {
+  it("snapshots at the end of every bucket and the change over the period", () => {
     const s = computeStock(ctx(units, ["2026-02", "2026-03"]));
-    expect(s.snapshots.map((x) => [x.period, x.total])).toEqual([
-      ["2026-02", 2],
-      ["2026-03", 2],
+    expect(s.snapshots.map((x) => [x.day, x.total])).toEqual([
+      ["2026-02-28", 2],
+      ["2026-03-31", 2],
     ]);
-    expect(s.delta).toMatchObject({ from: "2026-02", to: "2026-03", total: 0, perPrincipal: { WIAG: -1, AWKG: 1 } });
+    expect(s.startOfPeriod).toMatchObject({ day: "2026-01-31", total: 1 });
+    expect(s.delta).toMatchObject({ total: 1, perPrincipal: { WIAG: 0, AWKG: 1 } });
   });
 
-  it("single month shows six months and compares with the month before", () => {
+  it("a unit leaving later the same day is still in stock at end of the previous day", () => {
     const s = computeStock(ctx(units, ["2026-04"]));
-    expect(s.snapshots.map((x) => x.period)).toEqual(["2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04"]);
-    expect(s.endOfPeriod!.total).toBe(2);
+    expect(s.startOfPeriod.total).toBe(2);
+    expect(s.endOfPeriod.total).toBe(2);
     expect(s.delta!.total).toBe(0);
   });
 
-  it("no delta when the data does not reach back to the baseline month", () => {
+  it("no delta when the data does not reach back to the start", () => {
     expect(computeStock(ctx([unit({ inslag: "2026-04-02" })], ["2026-04"])).delta).toBeNull();
   });
 });
@@ -255,16 +261,6 @@ describe("profiles and flow", () => {
 });
 
 describe("insights and full report", () => {
-  it("flags a month below 25% of the others as incomplete", () => {
-    const units = [
-      ...times(100, () => unit({ uitslag: "2026-02-10" })),
-      ...times(100, () => unit({ uitslag: "2026-03-10" })),
-      ...times(10, () => unit({ uitslag: "2026-04-01" })),
-    ];
-    const v = computeVolume(ctx(units, ["2026-02", "2026-03", "2026-04"]), "hus");
-    expect([...incompleteMonths(v)]).toEqual(["2026-04"]);
-  });
-
   it("computes a complete, serialisable report", () => {
     const units = [
       ...times(40, (i) => unit({ uitgaandeRit: `R${i % 4}`, uitslag: "2026-03-10", vertrek: "2026-03-10", dagenInOpslag: 5, losLand: "DE" })),
@@ -272,8 +268,8 @@ describe("insights and full report", () => {
         unit({ uitgaandeRit: `S${i % 3}`, uitslag: "2026-04-10", vertrek: "2026-04-10", dagenInOpslag: 9, principal: i % 2 ? "AWKG" : "WIAG", losLand: i % 3 ? "DE" : "FR" }),
       ),
     ];
-    const r = computeReport(units, ["2026-04", "2026-03"]);
-    expect(r.periods).toEqual(["2026-03", "2026-04"]);
+    const r = computeReport(units, months(["2026-03", "2026-04"]));
+    expect(r.period.from).toBe("2026-03-01");
     expect(r.onTimeLoading.pct).toBe(100);
     expect(r.insights.length).toBeGreaterThan(0);
     expect(r.insights.every((i) => i.slide)).toBe(true);

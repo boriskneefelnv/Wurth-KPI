@@ -1,5 +1,4 @@
 import { dayKey, parseDateValue, periodEnd, periodLabelEn, shiftPeriod, workdaysInPeriods } from "@/core/dates";
-import { trendBuckets } from "@/core/report/context";
 
 describe("parseDateValue", () => {
   it("parses Excel serials as wall-clock", () => {
@@ -47,20 +46,3 @@ describe("period helpers", () => {
   });
 });
 
-describe("trendBuckets", () => {
-  it("splits a single month into Monday-based weeks clipped to the month", () => {
-    // April 2026 starts on a Wednesday.
-    const b = trendBuckets(["2026-04"]);
-    expect(b.map((x) => [x.label, x.from, x.to])).toEqual([
-      ["Week 1", "2026-04-01", "2026-04-05"],
-      ["Week 2", "2026-04-06", "2026-04-12"],
-      ["Week 3", "2026-04-13", "2026-04-19"],
-      ["Week 4", "2026-04-20", "2026-04-26"],
-      ["Week 5", "2026-04-27", "2026-04-30"],
-    ]);
-  });
-
-  it("uses one bucket per month for multiple months", () => {
-    expect(trendBuckets(["2026-03", "2026-04"]).map((b) => b.key)).toEqual(["2026-03", "2026-04"]);
-  });
-});

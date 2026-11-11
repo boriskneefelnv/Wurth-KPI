@@ -1,4 +1,4 @@
-import { dayKey, periodOf, workdaysInPeriods } from "../dates";
+import { dayKey } from "../dates";
 import type { DayKey } from "../types";
 import type { ReportContext } from "./context";
 
@@ -8,7 +8,7 @@ export interface DailyVolumeBlock {
   totals: { inbound: number; outbound: number; total: number };
   /** Average over days with recorded activity. */
   avgPerActiveDay: { inbound: number; outbound: number; total: number } | null;
-  /** Average over workdays (Mon–Fri, minus holidays) of the selected months. */
+  /** Average over workdays (Mon–Fri, minus holidays) in the period. */
   avgPerWorkday: { inbound: number; outbound: number; total: number } | null;
   peak: { day: DayKey; total: number } | null;
 }
@@ -21,7 +21,7 @@ export interface DailyVolumeBlock {
 export function computeDailyVolume(ctx: ReportContext): DailyVolumeBlock {
   const days = new Map<DayKey, { inbound: number; outbound: number }>();
   const add = (d: Date, dir: "inbound" | "outbound") => {
-    if (!ctx.selectedSet.has(periodOf(d))) return;
+    if (!ctx.inPeriod(d)) return;
     const k = dayKey(d);
     let e = days.get(k);
     if (!e) days.set(k, (e = { inbound: 0, outbound: 0 }));
@@ -49,7 +49,7 @@ export function computeDailyVolume(ctx: ReportContext): DailyVolumeBlock {
     perDay,
     totals,
     avgPerActiveDay: avg(perDay.length),
-    avgPerWorkday: avg(workdaysInPeriods(ctx.selected, ctx.holidays)),
+    avgPerWorkday: avg(ctx.workdays),
     peak,
   };
 }

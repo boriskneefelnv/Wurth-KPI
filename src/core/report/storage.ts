@@ -22,10 +22,10 @@ function stats(units: readonly WmsUnit[]): StorageStats {
   return { count: units.length, avgDays: mean(days), medianDays: median(days), buckets };
 }
 
-/** HUs that left the warehouse in a selected month and have a storage duration. */
+/** HUs that left the warehouse in the period and have a storage duration. */
 export function storagePopulation(ctx: ReportContext): WmsUnit[] {
   return ctx.units.filter(
-    (u) => u.outboundPeriod !== null && ctx.selectedSet.has(u.outboundPeriod) && u.dagenInOpslag !== null,
+    (u) => ctx.inPeriod(u.uitslagUnit) && u.dagenInOpslag !== null,
   );
 }
 

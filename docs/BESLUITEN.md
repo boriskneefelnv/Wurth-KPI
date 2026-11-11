@@ -51,6 +51,20 @@ t.o.v. Lovable; graag bevestigen.**
 | B25 | Ambigue klachten worden apart geteld (in beide richtingen tot ze zijn opgelost). | Vielen weg |
 | B26 | De klacht-KPI is een geteste TypeScript-functie. Of die in de browser of als database-functie draait, is een keuze voor fase 2; de logica blijft gelijk. | Alleen SQL-RPC, zonder tests |
 
+## Rapportperiodes (besloten met Boris, slide-sessie 1)
+
+| # | Besluit |
+|---|---|
+| B27 | Rapportsoorten: **week, maand, kwartaal, half jaar, jaar** (`src/core/period.ts`). Weken zijn ISO-weken (ma–zo). |
+| B28 | Vergelijkingen: week ↔ vorige week; maand ↔ vorige maand **of** zelfde maand vorig jaar (keuze); kwartaal en half jaar ↔ vorige periode **en** zelfde periode vorig jaar; jaar ↔ vorig jaar. |
+| B29 | Alleen periodes en vergelijkingen die de data volledig dekt, worden aangeboden. Dekking = eerste t/m laatste dag met een uitslag in de export (oude inslagdatums van voorraad tellen niet). Een periode telt als gedekt als de eerste én laatste werkdag erbinnen vallen. Later (fase 2) komt de dekking uit de opgeslagen imports. |
+| B30 | Staven binnen een rapport: week → dagen, maand → ISO-weken (afgekapt op de maand, label "Wk 14"), kwartaal/half jaar/jaar → maanden. |
+| B31 | Gemiddelde per staaf = totaal ÷ aantal staven (ook lege), want de periode is volledig gedekt. Lovable deelde door "actieve maanden". |
+| B32 | Volumeslide (ontwerp A): HU's als staven, ritten als getal eronder, geen schakelaar. Inbound op Inslag Unit, outbound op Uitslag Unit; ritten op hun ritdatum. |
+| B33 | Grijze vergelijkingsstaven alleen als de staven één-op-één passen (week, kwartaal, half jaar, jaar); bij voorkeur zelfde periode vorig jaar. Bij een maandrapport (4–6 weken) alleen totalen vergelijken. |
+| B34 | Controle-overzicht per periode en richting (`reconcileVolume`): rijen in bestand → afgekeurd per reden → meegeteld, opdrachtgevers die onder "Overig" vallen, HU's zonder rit, en ritten die door de ritdatum in een andere periode tellen. |
+| B35 | Voorraad: voorlopig een momentopname aan het eind van elke staaf plus de verandering over de periode. Wordt besproken bij de voorraadslide. |
+
 ## Open vragen
 
 1. **Opdrachtgevers**: welke exacte namen staan in de kolom *Opdrachtgever*? De mapping in
