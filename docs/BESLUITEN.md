@@ -83,16 +83,31 @@ t.o.v. Lovable; graag bevestigen.**
 |---|---|
 | B43 | Exact dubbele rijen in het unitoverzicht (zelfde SSCC "Extern", zelfde ritten en scantijden) worden één keer geteld. In de export okt 2025 t/m jun 2026 waren dat 125 rijen. Een pallet die echt twee keer door het magazijn ging, blijft staan. |
 | B44 | Met rittenlijsten bepaalt de lijst welke ritten meetellen; HU's tellen alleen mee als hun rit meetelt, op de ritdatum. Ritten die niet op de lijst staan en HU's zonder rit gaan naar de controlelijst, niet naar de slide. Zo bestaan HU's en ritten uit dezelfde set. |
-| B45 | Ritten die niet afgerond zijn (In afwachting, In transit, Vrijgegeven) tellen niet mee. |
+| B45 | ~~Ritten die niet afgerond zijn tellen niet mee.~~ Vervangen door B49. |
 | B46 | Aansluiting: HU's in het unitoverzicht mogen maximaal 2% afwijken van de units op de rittenlijsten. Anders volgt een waarschuwing en is de periode niet bruikbaar als vergelijking. |
 | B47 | Controlelijst per periode (Excel): ritten zonder HU's, ritten niet op de lijst, afwijkende aantallen, niet afgerond, test en cancel. |
 | B48 | Slides in de huisstijl van de Neele-Vat business update: headerfoto met tab, Maasvlakte-logo, label, kop en één ondersteunende regel, kerncijfers als rij, grafieken in kaarten. Engelse tekst met Nederlandse getalnotatie (11.615; 16,7). Geen streepjes of speciale tekens in lopende tekst: "up 12%", "down 4%", "stable" (minder dan 2%). |
+
+## Zuiverste beeld voor de klant (analyse jan 2025 t/m jun 2026)
+
+Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tussen rittenlijst en gescande pallets 0,1–0,3%. Probleemritten vallen bijna allemaal in jan–mrt 2025 (begin van de export).
+
+| # | Besluit |
+|---|---|
+| B49 | **Gescande pallets zijn leidend.** Een rit op de rittenlijst telt mee als er minstens één pallet op is gescand (inslag of uitslag). Status van de lijst ("In transit", "Vrijgegeven") en "CANCEL" in de referentie tellen alleen als er niets is gescand. Vervangt B45: 15 inkomende ritten met 285 echt ingeslagen pallets stonden nog open op de lijst. Instelbaar terug naar de statusregel (`basis: "status"`). |
+| B50 | HU's = gescande pallets; de datum komt van de rittenlijst. Wijkt het aantal af van "Units" op de lijst, dan telt de scan (staat in de controlelijst). |
+| B51 | Ritten zonder één gescande pallet en testritten tellen niet mee en staan in de controlelijst. Pallets die op een andere rit zijn geboekt (bv. 266500004263 / 4265) tellen op de rit waarop ze gescand zijn. |
+| B52 | Meerdere unitoverzichten kunnen worden gecombineerd; overlap wordt niet dubbel geteld. Een export met precies 50.000 rijen is afgekapt door de WMS (melding). |
+| B53 | Export-advies: unitoverzicht per halfjaar (onder 50.000 rijen) en met Laaddatum vanaf twee maanden vóór de eerste rapportmaand; de aansluitcontrole markeert een onvolledig begin (jan 2025: 63% uitgaand). |
+| B54 | Werkdagen: ma t/m vr zonder magazijnfeestdagen (Nieuwjaarsdag, Tweede Paasdag, Koningsdag, Hemelvaart, Tweede Pinksterdag, Kerst; Bevrijdingsdag alleen in lustrumjaren). Goede Vrijdag is een werkdag. Afgeleid uit de scans 2025–2026. |
+| B55 | Kop volumeslide: vergelijking met vorig jaar als die volume had, anders met de vorige periode. Op de Totaal-slide wordt de principal genoemd die de verandering verklaart (bv. AWKG, actief sinds sept 2025). |
+| B56 | Kop van de slide is niet handmatig aan te passen (besloten). Vier volumeslides blijven (WIAG, AWKG, Liqui Moly, Totaal). |
 
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.
 2. **On-time loading**: is "eerste HU op tijd weg" (huidig) echt de bedoeling, of moet de hele rit op tijd zijn (`latest`)?
 3. **Trefwoorden** voor warehouse en afwijkingen (`src/core/complaints/classify.ts`): controleren tegen echte klachten.
-4. **Feestdagen** meenemen in werkdag-gemiddelden?
+4. ~~Feestdagen~~: ja, zie B54.
 5. **Bestandsformaat** WMS: altijd `.xlsx`? (`.xls` vraagt een andere lezer.)
 6. **AFAS-export**: welke kolommen bevatten Sales/Vendor, incidentdatum en het NV-dossiernummer?

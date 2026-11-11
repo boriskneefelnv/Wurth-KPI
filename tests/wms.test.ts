@@ -187,3 +187,15 @@ describe("duplicate rows", () => {
     expect(res.validation.rejected).toEqual([expect.objectContaining({ rowIndex: 3, reason: "duplicate" })]);
   });
 });
+
+describe("mergeWmsExports", () => {
+  it("combines overlapping exports without double counting", async () => {
+    const { mergeWmsExports } = await import("@/core/wms/excel");
+    const a = parseWmsSheets([sheet([row({ Referentie: "A" }), row({ Referentie: "B" }), row({ Referentie: "B" })])]);
+    const b = parseWmsSheets([sheet([row({ Referentie: "B" }), row({ Referentie: "C" })])]);
+    const merged = mergeWmsExports([a, b]);
+    // A, B twice (two identical pallets in export a), C; the B in export b is the same pallet
+    expect(merged.rows.map((r) => r["Referentie"])).toEqual(["A", "B", "B", "C"]);
+    expect(merged.sources.map((s) => s.added)).toEqual([3, 1]);
+  });
+});

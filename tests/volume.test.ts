@@ -60,7 +60,13 @@ describe("volume slide model", () => {
   it("writes a short headline and a supporting line without dashes", () => {
     const m = volumeSlide(set, "Total");
     expect(m.headline).toBe("Outbound up 50% on Q2 2025, inbound down 25%.");
-    expect(m.subline).toBe("The outbound increase comes mainly from France (50 more HUs). Busiest day was 5 May with 60 HUs in.");
+    // AWKG (30 HUs, none last year) explains most of the +50: named as the driver
+    expect(m.subline).toBe("AWKG had no volume in Q2 2025 and accounts for 30 of the outbound HUs. Busiest day was 5 May with 60 HUs in.");
+    const wiag = volumeSlide(set, "WIAG");
+    expect(wiag.subline).toMatch(/^The outbound increase comes mainly from France \(50 more HUs\)\./);
+    const awkg = volumeSlide(set, "AWKG");
+    expect(awkg.headline).toBe("30 HUs out on 1 ride, 0 HUs in on 0 rides.");
+    expect(awkg.subline).toMatch(/^AWKG had no volume yet in Q2 2025\./);
     expect(`${m.headline} ${m.subline}`).not.toMatch(/[\u2013\u2014\u2212]/);
   });
 

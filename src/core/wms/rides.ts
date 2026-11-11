@@ -1,7 +1,7 @@
 import { principalSortKey, RIDE_DATE_THRESHOLD } from "../constants";
 import { dayKey, periodOfDayKey } from "../dates";
 import type { DayKey, Direction, Principal, Ride, RideDate, Shipment, WmsUnit } from "../types";
-import { isCountedRide, type PlannedRide, type PlannedRideIndex, type RideFilter } from "./rideLists";
+import { isEligibleRide, type PlannedRide, type PlannedRideIndex, type RideFilter } from "./rideLists";
 
 /**
  * Canonical day of a ride (or shipment) from the dates of its HUs.
@@ -72,7 +72,7 @@ export interface MaterializeResult {
   shipments: Shipment[];
   /** Rides without any dated HU and without a planned date; they cannot be placed in a period. */
   undatedRides: { direction: Direction; ritNummer: string; huCount: number }[];
-  /** Counted rides from the ride lists that have no HUs in the unit file. */
+  /** Finished, non-empty rides on the ride lists without any scanned pallet in the unit file. */
   listOnlyRides: PlannedRide[];
 }
 
@@ -103,9 +103,11 @@ export function materializeRides(units: readonly WmsUnit[], options: Materialize
     }
 
     const plannedIdx = options.planned?.[direction];
+    const scanned = (rit: string) => (byRide.get(rit) ?? []).filter((u) => directionalDate(u, direction)).length;
+    const byScans = (options.rideFilter?.basis ?? "scans") === "scans";
     if (plannedIdx) {
       for (const p of plannedIdx.values()) {
-        if (!byRide.has(p.ritNummer) && isCountedRide(p, options.rideFilter)) listOnlyRides.push(p);
+        if (isEligibleRide(p, options.rideFilter) && p.completed && p.units > 0 && scanned(p.ritNummer) === 0) listOnlyRides.push(p);
       }
     }
 
@@ -113,7 +115,8 @@ export function materializeRides(units: readonly WmsUnit[], options: Materialize
     for (const [ritNummer, list] of byRide) {
       const scans = resolveRideDate(list.map((u) => directionalDate(u, direction)));
       const plan = plannedIdx?.get(ritNummer);
-      const usePlan = plan && isCountedRide(plan, options.rideFilter) ? plan : null;
+      const usePlan =
+        plan && isEligibleRide(plan, options.rideFilter) && (!byScans || scanned(ritNummer) > 0) ? plan : null;
       if (!scans && !usePlan) {
         undatedRides.push({ direction, ritNummer, huCount: list.length });
         continue;

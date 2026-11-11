@@ -1,10 +1,14 @@
 import { dayKey } from "../dates";
-import { bucketsFor, inRange, workdaysInRange, type ReportPeriod, type TrendBucket } from "../period";
+import { warehouseHolidaySet } from "../holidays";
+import { addDays, bucketsFor, inRange, workdaysInRange, type ReportPeriod, type TrendBucket } from "../period";
 import { directionalDate, indexRides, materializeRides, rideOf, type RideIndex } from "../wms/rides";
 import type { DayKey, Direction, Principal, Ride, WmsUnit } from "../types";
 
 export interface ReportOptions {
-  /** Days that do not count as workdays (YYYY-MM-DD). Default: none. */
+  /**
+   * Days that do not count as workdays (YYYY-MM-DD). Default: the warehouse
+   * holiday calendar (see holidays.ts). Pass [] for Monday–Friday only.
+   */
   holidays?: Iterable<DayKey>;
   /**
    * On-time loading rule. `earliest` (Lovable behaviour): earliest outbound
@@ -54,7 +58,7 @@ export function buildContext(
       list.push(u);
     }
   }
-  const holidays = new Set(options.holidays ?? []);
+  const holidays = new Set(options.holidays ?? warehouseHolidaySet(addDays(period.from, -400), period.to));
   const allRides = rides ?? materializeRides(units).rides;
   // With ride lists, only rides counted on the lists (and their HUs) take part.
   const listsUsed = allRides.some((r) => r.listStatus !== "no-list");
@@ -65,9 +69,9 @@ export function buildContext(
     const rit = rideOf(u, direction);
     const ride = rit ? rideIndex[direction].get(rit) : undefined;
     if (listsUsed) {
-      // The list decides: an HU counts when its ride is counted, on the ride's date.
-      if (!ride) return null;
-      return huDating === "ride" || !scan ? ride.canonicalDate : dayKey(scan);
+      // An HU counts when it was scanned and its ride is counted, on the ride's date.
+      if (!ride || !scan) return null;
+      return huDating === "ride" ? ride.canonicalDate : dayKey(scan);
     }
     if (!scan) return null;
     if (huDating === "ride" && ride) return ride.canonicalDate;

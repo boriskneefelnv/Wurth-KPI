@@ -32,3 +32,4 @@ export * from "./slides/volume";
 export * from "./wms/rideLists";
 export * from "./report/quality";
 export * from "./slides/format";
+export * from "./holidays";

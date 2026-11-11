@@ -63,18 +63,19 @@ describe("parseRideList", () => {
   });
 });
 
-describe("planned dates", () => {
+describe("planned dates and the scan rule", () => {
   const planned = indexPlannedRides([
     parseRideList([
       laden([
         [7001, "r", "Geladen", 3, "2026-03-31"],
-        [7002, "r", "Geladen", 0, "2026-04-02"], // empty → not used for dating
-        [7003, "r", "Geladen", 50, "2026-04-03"], // not in unit file
+        [7002, "r", "In afwachting", 1, "2026-04-02"], // open status, but its pallet was scanned
+        [7003, "r", "Geladen", 50, "2026-04-03"], // finished, no pallets in the unit file
+        [7004, "r", "In afwachting", 5, "2026-04-03"], // open, nothing scanned
       ]),
     ]),
   ]);
   const units = [
-    // scanned 1 April, but the ride list says 31 March → ride and HUs count in March
+    // scanned 1 April, but the ride list says 31 March: ride and HUs count in March
     ...times(3, () => unit({ uitgaandeRit: "7001", uitslag: "2026-04-01 06:00" })),
     unit({ uitgaandeRit: "7002", uitslag: "2026-04-02" }),
     unit({ uitgaandeRit: "7009", uitslag: "2026-04-02" }), // not on the list
@@ -89,21 +90,25 @@ describe("planned dates", () => {
       dateResolution: "planned",
       plannedUnits: 3,
       period: "2026-03",
+      listStatus: "counted",
     });
-    expect(rides.find((r) => r.ritNummer === "7002")).toMatchObject({ canonicalDate: "2026-04-02", dateResolution: "single" });
     expect(listOnlyRides.map((r) => r.ritNummer)).toEqual(["7003"]);
   });
 
-  it("with ride lists only counted rides and their HUs take part, on the ride date", () => {
-    expect(rides.find((r) => r.ritNummer === "7001")!.listStatus).toBe("counted");
-    expect(rides.find((r) => r.ritNummer === "7002")!.listStatus).toBe("ignored"); // empty on the list
+  it("counts a ride when its pallets were scanned, whatever the list status", () => {
+    expect(rides.find((r) => r.ritNummer === "7002")).toMatchObject({ listStatus: "counted", dateResolution: "planned" });
     expect(rides.find((r) => r.ritNummer === "7009")!.listStatus).toBe("not-on-list");
     const april = computeVolume(buildContext(units, makePeriod("month", "2026-04"), {}, rides), "hus");
-    expect(april.outbound.Total.total).toBe(0); // 7002 ignored, 7009 not on list, no-ride HU excluded
+    expect(april.outbound.Total.total).toBe(1); // 7002; 7009 not on list, HU without ride excluded
     const march = computeVolume(buildContext(units, makePeriod("month", "2026-03"), {}, rides), "rides");
     expect(march.outbound.Total.total).toBe(1);
     const byScan = computeVolume(buildContext(units, makePeriod("month", "2026-04"), { huDating: "scan" }, rides), "hus");
-    expect(byScan.outbound.Total.total).toBe(3); // 7001's HUs on their own scan day
+    expect(byScan.outbound.Total.total).toBe(4); // 7001's HUs on their own scan day + 7002
+  });
+
+  it("can fall back to the status rule", () => {
+    const byStatus = materializeRides(units, { planned, rideFilter: { basis: "status" } }).rides;
+    expect(byStatus.find((r) => r.ritNummer === "7002")!.listStatus).toBe("ignored");
   });
 
   it("without ride lists HUs count on their ride date, HUs without a ride on their scan", () => {
@@ -115,13 +120,14 @@ describe("planned dates", () => {
   it("reconciles the list with the unit file", () => {
     const r = reconcileRideLists(units, planned, rides, makePeriod("quarter", "2026-Q2")).outbound;
     expect(r).toMatchObject({
-      listRides: 1, // 7003 (7001 is in March, 7002 is empty)
-      listUnits: 50,
-      ignored: { empty: 1 },
-      matchedRides: 0,
+      listRides: 1,
+      listUnits: 1,
+      matchedUnitFileHus: 1,
+      countedWithOpenStatus: { rides: 1 },
+      notHandled: { rides: 1, units: 5 },
       missingInUnitFile: { rides: 1, units: 50 },
       notOnList: { rides: 1, hus: 1 },
-      completeness: 0,
+      completeness: 1,
     });
     const q1 = reconcileRideLists(units, planned, rides, makePeriod("quarter", "2026-Q1")).outbound;
     expect(q1).toMatchObject({ listUnits: 3, matchedUnitFileHus: 3, completeness: 1, dateAgreement: { sameDay: 0, withinOneDay: 1, otherMonth: 1 } });

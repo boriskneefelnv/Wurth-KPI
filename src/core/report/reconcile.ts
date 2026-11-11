@@ -1,7 +1,7 @@
 import { dayKey } from "../dates";
 import { bucketsFor, inRange, type ReportPeriod } from "../period";
 import type { DayKey, Direction, Principal, Ride, WmsUnit } from "../types";
-import { isCountedRide, type PlannedRide, type PlannedRideIndex, type RideFilter } from "../wms/rideLists";
+import { isEligibleRide, type PlannedRide, type PlannedRideIndex, type RideFilter } from "../wms/rideLists";
 import { PRINCIPALS } from "../types";
 import type { RejectedRow, RejectReason } from "../wms/enrich";
 import { directionalDate, rideOf } from "../wms/rides";
@@ -106,13 +106,15 @@ export interface RideListReconciliation {
   listUnits: number;
   /** List rides in the period that are ignored, with their units. */
   ignored: { test: { rides: number; units: number }; cancelled: { rides: number; units: number }; empty: number };
-  /** Counted rides whose status is not final (not Geladen / Gelost). */
-  notCompleted: { rides: number; units: number; statuses: Record<string, number> };
+  /** Counted rides (pallets scanned) whose list status is still open or whose reference says cancel. */
+  countedWithOpenStatus: { rides: number; units: number; statuses: Record<string, number> };
+  /** List rides with an open status and no scanned pallet (not counted, nothing happened yet). */
+  notHandled: { rides: number; units: number };
   /** Counted list rides that have HUs in the unit file. */
   matchedRides: number;
   matchedListUnits: number;
   matchedUnitFileHus: number;
-  /** Counted list rides without any HU in the unit file (principal and details unknown). */
+  /** Finished list rides without any scanned pallet in the unit file (not counted). */
   missingInUnitFile: { rides: number; units: number; examples: { ritNummer: string; plannedDate: DayKey; units: number }[] };
   /** Rides in the unit file, dated in the period by their scans, that are not on the list. */
   notOnList: { rides: number; hus: number };
@@ -132,18 +134,23 @@ export function reconcileRideLists(
 ): Record<Direction, RideListReconciliation> {
   const buckets = bucketsFor(period);
   const forDirection = (direction: Direction): RideListReconciliation => {
+    // Scanned pallets per ride (the physical evidence).
     const hus = new Map<string, number>();
     for (const u of units) {
       const rit = rideOf(u, direction);
-      if (rit) hus.set(rit, (hus.get(rit) ?? 0) + 1);
+      if (rit && directionalDate(u, direction)) hus.set(rit, (hus.get(rit) ?? 0) + 1);
     }
+    const countedSet = new Set(rides.filter((r) => r.direction === direction && r.listStatus === "counted").map((r) => r.ritNummer));
     const inP = [...planned[direction].values()].filter((r) => r.plannedDate && inRange(r.plannedDate, period));
-    const counted = inP.filter((r) => isCountedRide(r, filter));
+    const counted = inP.filter((r) => countedSet.has(r.ritNummer));
     const test = inP.filter((r) => r.isTest);
-    const cancelled = inP.filter((r) => r.isCancelled && !r.isTest);
-    const notCompleted = counted.filter((r) => !r.completed);
-    const matched = counted.filter((r) => hus.has(r.ritNummer));
-    const missing = counted.filter((r) => !hus.has(r.ritNummer));
+    const cancelled = inP.filter((r) => r.isCancelled && !r.isTest && !countedSet.has(r.ritNummer));
+    const openCounted = counted.filter((r) => !r.completed || r.isCancelled);
+    const notHandled = inP.filter((r) => !r.completed && !r.isTest && r.units > 0 && !countedSet.has(r.ritNummer));
+    const matched = counted;
+    const missing = inP.filter(
+      (r) => r.completed && !r.isTest && !r.isCancelled && r.units > 0 && !countedSet.has(r.ritNummer) && isEligibleRide(r, filter),
+    );
     const rideMap = new Map(rides.filter((r) => r.direction === direction).map((r) => [r.ritNummer, r]));
     const notOnList = rides.filter(
       (r) => r.direction === direction && !planned[direction].has(r.ritNummer) && inRange(r.canonicalDate, period),
@@ -163,7 +170,7 @@ export function reconcileRideLists(
     }
 
     const statuses: Record<string, number> = {};
-    for (const r of notCompleted) statuses[r.status || "(leeg)"] = (statuses[r.status || "(leeg)"] ?? 0) + 1;
+    for (const r of openCounted) statuses[r.status || "(leeg)"] = (statuses[r.status || "(leeg)"] ?? 0) + 1;
 
     return {
       listRides: counted.length,
@@ -173,7 +180,8 @@ export function reconcileRideLists(
         cancelled: { rides: cancelled.length, units: sum(cancelled) },
         empty: inP.filter((r) => r.units === 0 && !r.isTest && !r.isCancelled).length,
       },
-      notCompleted: { rides: notCompleted.length, units: sum(notCompleted), statuses },
+      countedWithOpenStatus: { rides: openCounted.length, units: sum(openCounted), statuses },
+      notHandled: { rides: notHandled.length, units: sum(notHandled) },
       matchedRides: matched.length,
       matchedListUnits: sum(matched),
       matchedUnitFileHus: matchedHus,

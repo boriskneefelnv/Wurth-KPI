@@ -120,29 +120,65 @@ function outboundDriver(set: ReportSet, key: SeriesKey, comparison: OperationalR
   return best && Math.abs(best.delta) >= 0.4 * Math.abs(total) ? best : null;
 }
 
+/** Main principal with the largest outbound change, if it explains at least 40% of the total change. */
+function principalDriver(set: ReportSet, comparison: OperationalReport): { principal: MainPrincipal; delta: number; before: number } | null {
+  const total = (r: OperationalReport, k: SeriesKey) => r.perspectives.hus.volume.outbound[k].total;
+  const change = total(set.current, "Total") - total(comparison, "Total");
+  if (change === 0) return null;
+  let best: { principal: MainPrincipal; delta: number; before: number } | null = null;
+  for (const p of ["WIAG", "AWKG", "Liqui Moly"] as const) {
+    const delta = total(set.current, p) - total(comparison, p);
+    if (Math.sign(delta) === Math.sign(change) && (!best || Math.abs(delta) > Math.abs(best.delta))) {
+      best = { principal: p, delta, before: total(comparison, p) };
+    }
+  }
+  return best && Math.abs(best.delta) >= 0.4 * Math.abs(change) ? best : null;
+}
+
 /**
  * Headline: the change against the primary comparison (same period last year
- * if available, else the previous period); without comparison the totals.
- * Subline: what drives the outbound change, and the busiest day.
+ * when that has volume, else the previous period); without comparison the
+ * totals. Subline: what drives the outbound change, and the busiest day.
  */
 function texts(set: ReportSet, key: SeriesKey, inbound: VolumePanel, outbound: VolumePanel): { headline: string; subline: string | null } {
-  const primary = set.comparisons.find((c) => c.kind === "lastYear") ?? set.comparisons[0];
-  let headline: string;
   const extra: string[] = [];
-  const o = primary ? outbound.comparisons.find((c) => c.kind === primary.kind)! : null;
-  const i = primary ? inbound.comparisons.find((c) => c.kind === primary.kind)! : null;
-  if (primary && (o?.husDeltaPct != null || i?.husDeltaPct != null)) {
+  const has = (kind: string) =>
+    [inbound, outbound].some((p) => p.comparisons.find((c) => c.kind === kind)?.husDeltaPct != null);
+  const lastYear = set.comparisons.find((c) => c.kind === "lastYear");
+  const primary = lastYear && has("lastYear") ? lastYear : set.comparisons.find((c) => has(c.kind));
+  if (lastYear && lastYear !== primary && key !== "Total") {
+    extra.push(`${key} had no volume yet in ${lastYear.report.period.label}.`);
+  }
+
+  let headline: string;
+  if (primary) {
+    const o = outbound.comparisons.find((c) => c.kind === primary.kind)!;
+    const i = inbound.comparisons.find((c) => c.kind === primary.kind)!;
+    const label = primary.report.period.label;
     const parts: string[] = [];
-    if (o?.husDeltaPct != null) parts.push(`Outbound ${changeWords(o.husDeltaPct)} on ${primary.report.period.label}`);
-    if (i?.husDeltaPct != null) parts.push(`${parts.length ? "inbound" : "Inbound"} ${changeWords(i.husDeltaPct)}${parts.length ? "" : ` on ${primary.report.period.label}`}`);
+    if (o.husDeltaPct != null) parts.push(`Outbound ${changeWords(o.husDeltaPct)} on ${label}`);
+    if (i.husDeltaPct != null) parts.push(parts.length ? `inbound ${changeWords(i.husDeltaPct)}` : `Inbound ${changeWords(i.husDeltaPct)} on ${label}`);
     headline = `${parts.join(", ")}.`;
-    const driver = outboundDriver(set, key, primary.report);
-    if (driver && o?.husDeltaPct != null && Math.abs(o.husDeltaPct) >= 5) {
-      extra.push(
-        driver.delta > 0
-          ? `The outbound increase comes mainly from ${countryName(driver.country)} (${fmtInt(driver.delta)} more HUs).`
-          : `The outbound decrease comes mainly from ${countryName(driver.country)} (${fmtInt(-driver.delta)} fewer HUs).`,
-      );
+
+    if (o.husDeltaPct != null && Math.abs(o.husDeltaPct) >= 5) {
+      const byPrincipal = key === "Total" ? principalDriver(set, primary.report) : null;
+      if (byPrincipal) {
+        const more = byPrincipal.delta > 0;
+        extra.push(
+          byPrincipal.before === 0
+            ? `${byPrincipal.principal} had no volume in ${label} and accounts for ${fmtInt(byPrincipal.delta)} of the outbound HUs.`
+            : `The outbound ${more ? "increase" : "decrease"} comes mainly from ${byPrincipal.principal} (${fmtInt(Math.abs(byPrincipal.delta))} ${more ? "more" : "fewer"} HUs).`,
+        );
+      } else {
+        const driver = outboundDriver(set, key, primary.report);
+        if (driver) {
+          extra.push(
+            driver.delta > 0
+              ? `The outbound increase comes mainly from ${countryName(driver.country)} (${fmtInt(driver.delta)} more HUs).`
+              : `The outbound decrease comes mainly from ${countryName(driver.country)} (${fmtInt(-driver.delta)} fewer HUs).`,
+          );
+        }
+      }
     }
   } else {
     headline = `${plural(outbound.totalHus, "HU", "HUs")} out on ${plural(outbound.totalRides, "ride", "rides")}, ${plural(inbound.totalHus, "HU", "HUs")} in on ${plural(inbound.totalRides, "ride", "rides")}.`;

@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 import {
   availablePeriods,
+  customPeriod,
   makePeriod,
   REPORT_KINDS,
   type ComparisonKind,
@@ -22,7 +23,7 @@ import { comparisonOptionsWithQuality, periodQuality, rideIssues, type RideIssue
 import { reconcileRideLists, reconcileVolume } from "../src/core/report/reconcile";
 import { computeReportSet } from "../src/core/report/report";
 import { volumeSlide, type VolumeSlideSubject } from "../src/core/slides/volume";
-import { parseWmsSheets } from "../src/core/wms/excel";
+import { mergeWmsExports, parseWmsSheets, WMS_EXPORT_ROW_LIMIT } from "../src/core/wms/excel";
 import { enrichWms } from "../src/core/wms/enrich";
 import { coverageFromRideLists, indexPlannedRides, parseRideList } from "../src/core/wms/rideLists";
 import { materializeRides } from "../src/core/wms/rides";
@@ -46,7 +47,15 @@ const read = async (f: string) => readXlsx(new Uint8Array(readFileSync(f)));
 const pct = (x: number | null) => (x === null ? "—" : `${(x * 100).toFixed(1)}%`);
 const n = (x: number) => x.toLocaleString("nl-NL");
 
-const enriched = enrichWms(parseWmsSheets(await read(args.units)));
+const unitParts = [];
+for (const f of args.units.split(",")) {
+  const p = parseWmsSheets(await read(f));
+  if (p.rows.length >= WMS_EXPORT_ROW_LIMIT) console.log(`LET OP: ${f} heeft ${n(p.rows.length)} rijen, waarschijnlijk afgekapt door de WMS-exportlimiet`);
+  unitParts.push(p);
+}
+const merged = mergeWmsExports(unitParts);
+if (unitParts.length > 1) console.log("SAMENGEVOEGD", merged.sources.map((s) => `${n(s.rows)} rijen, ${n(s.added)} nieuw`).join(" + "), "=", n(merged.rows.length));
+const enriched = enrichWms(merged);
 const lists = [parseRideList(await read(args.laden)), parseRideList(await read(args.lossen))];
 const planned = indexPlannedRides(lists);
 const { rides, listOnlyRides } = materializeRides(enriched.units, { planned });
@@ -66,8 +75,8 @@ console.log(`DEKKING (uit rittenlijsten)  ${coverage?.from} t/m ${coverage?.to}`
 for (const kind of REPORT_KINDS) console.log(`  ${kind}: ${availablePeriods(kind, coverage).map((p) => p.key).join(", ") || "—"}`);
 console.log(`Ritten alleen op lijst (geen HU's in unitoverzicht): ${listOnlyRides.length}`);
 
-const [kind, key] = args.period.split(":") as [ReportKind, string];
-const period = makePeriod(kind, key);
+const [kind, key] = args.period.split(":") as [ReportKind | "custom", string];
+const period = kind === "custom" ? customPeriod(...(key.split("..") as [string, string])) : makePeriod(kind, key);
 const requested = (args.compare ? args.compare.split(",") : []) as ComparisonKind[];
 const quality = (p: typeof period) => periodQuality(enriched.units, planned, rides, p);
 const options = comparisonOptionsWithQuality(period, coverage, quality);
@@ -83,7 +92,7 @@ for (const dir of ["inbound", "outbound"] as const) {
   const r = recList[dir];
   const rv = recVol[dir];
   console.log(`\n== ${dir.toUpperCase()}`);
-  console.log(`  rittenlijst: ${n(r.listRides)} ritten, ${n(r.listUnits)} units  (genegeerd: test ${r.ignored.test.rides}/${r.ignored.test.units}u, cancel ${r.ignored.cancelled.rides}, leeg ${r.ignored.empty}; niet afgerond ${r.notCompleted.rides} ritten/${r.notCompleted.units}u ${JSON.stringify(r.notCompleted.statuses)})`);
+  console.log(`  rittenlijst: ${n(r.listRides)} ritten, ${n(r.listUnits)} units  (genegeerd: test ${r.ignored.test.rides}/${r.ignored.test.units}u, cancel ${r.ignored.cancelled.rides}, leeg ${r.ignored.empty}; nog open zonder scans ${r.notHandled.rides} ritten/${r.notHandled.units}u; meegeteld ondanks open status ${r.countedWithOpenStatus.rides} ritten ${JSON.stringify(r.countedWithOpenStatus.statuses)})`);
   console.log(`  in unitoverzicht: ${n(r.matchedRides)} ritten, ${n(r.matchedUnitFileHus)} HU's (lijst zegt ${n(r.matchedListUnits)})  → volledigheid ${pct(r.completeness)}`);
   console.log(`  ontbreekt in unitoverzicht: ${n(r.missingInUnitFile.rides)} ritten, ${n(r.missingInUnitFile.units)} units`);
   console.log(`  niet op lijst: ${n(r.notOnList.rides)} ritten, ${n(r.notOnList.hus)} HU's`);
@@ -110,12 +119,12 @@ if (args.out) {
 
 if (args.issues) {
   const LABEL: Record<RideIssueKind, string> = {
-    "missing-in-unit-file": "Op rittenlijst, geen HU's in unitoverzicht",
-    "not-on-ride-list": "In unitoverzicht, niet op rittenlijst",
-    "unit-count-differs": "Aantal units wijkt af",
-    "ignored-not-completed": "Niet afgerond (telt niet mee)",
-    "ignored-test": "Test (telt niet mee)",
-    "ignored-cancelled": "Cancel met units (telt niet mee)",
+    "missing-in-unit-file": "Telt niet mee: afgerond op lijst, geen gescande pallets",
+    "not-on-ride-list": "Telt niet mee: pallets gescand, rit niet op lijst",
+    "unit-count-differs": "Telt mee: aantal gescande pallets wijkt af van lijst",
+    "counted-open-status": "Telt mee: pallets gescand, status lijst nog open of cancel",
+    "not-handled": "Telt niet mee: status open, niets gescand",
+    "ignored-test": "Telt niet mee: testrit",
   };
   const issues = rideIssues(enriched.units, planned, rides, period);
   const wb = new ExcelJS.Workbook();
@@ -129,7 +138,7 @@ if (args.issues) {
     { header: "Status rittenlijst", key: "status", width: 22 },
     { header: "Referentie", key: "ref", width: 22 },
     { header: "Units rittenlijst", key: "list", width: 15 },
-    { header: "HU's unitoverzicht", key: "hus", width: 17 },
+    { header: "Gescande pallets", key: "hus", width: 17 },
     { header: "Verschil", key: "diff", width: 10 },
     { header: "Opdrachtgever", key: "opdr", width: 28 },
     { header: "Dossiers (max 10)", key: "dos", width: 40 },

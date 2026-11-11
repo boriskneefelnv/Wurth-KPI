@@ -37,8 +37,8 @@ describe("volume", () => {
     expect(v.outbound.Total.peak).toEqual({ label: "Apr", value: 4 });
     expect(v.outbound.Total.peakDay).toEqual({ day: "2026-04-02", value: 4 });
     expect(v.inbound["Liqui Moly"].total).toBe(1);
-    // 22 workdays in March 2026 + 22 in April 2026
-    expect(v.outbound.Total.avgPerWorkday).toBeCloseTo(6 / 44);
+    // 22 workdays in March 2026 + 20 in April 2026 (Easter Monday and King's Day closed)
+    expect(v.outbound.Total.avgPerWorkday).toBeCloseTo(6 / 42);
   });
 
   it("counts each ride once, on its canonical day; shared rides count for every principal", () => {
@@ -223,7 +223,7 @@ describe("daily volume", () => {
       { day: "2026-04-03", inbound: 0, outbound: 1, total: 1 },
     ]);
     expect(d.avgPerActiveDay!.total).toBe(1.5);
-    expect(d.avgPerWorkday!.total).toBeCloseTo(3 / 22);
+    expect(d.avgPerWorkday!.total).toBeCloseTo(3 / 20);
     expect(d.peak).toEqual({ day: "2026-04-02", total: 2 });
   });
 });

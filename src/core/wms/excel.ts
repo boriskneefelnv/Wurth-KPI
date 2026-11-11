@@ -138,3 +138,52 @@ export function parseWmsSheets(sheets: SheetData[]): ParsedWms {
     optionalFound,
   };
 }
+
+/**
+ * Combine several unit exports (e.g. one per period, because the WMS stops
+ * at 50.000 rows). Where exports overlap, a row is taken as often as it
+ * occurs in the export that has it most often: identical rows in two files
+ * are one HU, two identical rows within one file stay two (exact duplicates
+ * within an export are handled later by the SSCC check).
+ */
+export function mergeWmsExports(parts: readonly ParsedWms[]): ParsedWms & { sources: { sheetName: string; rows: number; added: number }[] } {
+  if (parts.length === 0) throw new WmsParseError("Geen unitoverzicht opgegeven.");
+  const columns = Object.keys(parts[0]!.rows[0] ?? {}).filter((k) => k !== "__rowIndex" && k !== "__source");
+  const sig = (r: RawWmsRow) =>
+    columns.map((k) => {
+      const v = r[k];
+      return v instanceof Date ? v.getTime() : v === null || v === undefined ? "" : String(v).trim();
+    }).join("\u0001");
+  const taken = new Map<string, number>();
+  const rows: RawWmsRow[] = [];
+  const sources: { sheetName: string; rows: number; added: number }[] = [];
+  parts.forEach((p, fileIdx) => {
+    const inFile = new Map<string, number>();
+    let added = 0;
+    for (const r of p.rows) {
+      const s = sig(r);
+      const n = (inFile.get(s) ?? 0) + 1;
+      inFile.set(s, n);
+      if (n > (taken.get(s) ?? 0)) {
+        taken.set(s, n);
+        rows.push({ ...r, __source: fileIdx });
+        added++;
+      }
+    }
+    sources.push({ sheetName: p.sheetName, rows: p.rows.length, added });
+  });
+  const first = parts[0]!;
+  return {
+    ...first,
+    rows,
+    optionalFound: {
+      vertrek: parts.find((p) => p.optionalFound.vertrek)?.optionalFound.vertrek ?? null,
+      losdatum: parts.find((p) => p.optionalFound.losdatum)?.optionalFound.losdatum ?? null,
+      sscc: parts.find((p) => p.optionalFound.sscc)?.optionalFound.sscc ?? null,
+    },
+    sources,
+  };
+}
+
+/** The WMS export limit; an export with exactly this many data rows is probably cut off. */
+export const WMS_EXPORT_ROW_LIMIT = 50_000;

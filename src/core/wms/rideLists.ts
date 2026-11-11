@@ -136,8 +136,17 @@ export function parseRideList(sheets: SheetData[], direction?: Direction): Parse
   throw new RideListParseError(`Geen rittenlijst gevonden: verwacht kolommen ${REQUIRED.join(", ")}.`);
 }
 
-/** Which planned rides count as real rides for the KPIs. */
+/**
+ * Which planned rides count as real rides for the KPIs.
+ *
+ * `basis: "scans"` (default): a ride on the list counts when at least one of
+ * its pallets was physically scanned (Inslag Unit / Uitslag Unit) in the unit
+ * file; list status and a "cancel" reference only matter when nothing was
+ * scanned. Test rides never count. `basis: "status"`: the list status decides
+ * (Geladen / Gelost, not cancelled, not empty).
+ */
 export interface RideFilter {
+  basis?: "scans" | "status";
   /** Default true: rides with "test" in the reference are ignored. */
   excludeTest?: boolean;
   /** Default true: rides with "cancel" in the reference are ignored. */
@@ -148,6 +157,14 @@ export interface RideFilter {
   excludeNotCompleted?: boolean;
 }
 
+/** Can this list ride count at all (before looking at scans)? */
+export function isEligibleRide(r: PlannedRide, f: RideFilter = {}): boolean {
+  if ((f.basis ?? "scans") === "status") return isCountedRide(r, f);
+  if ((f.excludeTest ?? true) && r.isTest) return false;
+  return r.plannedDate !== null;
+}
+
+/** Status-based rule (used with basis "status"). */
 export function isCountedRide(r: PlannedRide, f: RideFilter = {}): boolean {
   if ((f.excludeTest ?? true) && r.isTest) return false;
   if ((f.excludeCancelled ?? true) && r.isCancelled) return false;

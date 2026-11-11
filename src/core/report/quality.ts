@@ -1,7 +1,7 @@
 import { availableComparisons, comparisonPeriod, type ComparisonKind, type Coverage, type ReportPeriod } from "../period";
 import type { DayKey, Direction, Ride, WmsUnit } from "../types";
 import type { PlannedRideIndex } from "../wms/rideLists";
-import { rideOf } from "../wms/rides";
+import { directionalDate, rideOf } from "../wms/rides";
 import { reconcileRideLists } from "./reconcile";
 
 /** Maximum relative difference between unit file HUs and ride list units. */
@@ -77,12 +77,18 @@ export function comparisonOptionsWithQuality(
 // ---------------------------------------------------------------------------
 
 export type RideIssueKind =
+  /** Finished on the list, but no scanned pallet in the unit file: not counted. */
   | "missing-in-unit-file"
+  /** Pallets scanned on a ride that is not on the ride lists: not counted. */
   | "not-on-ride-list"
+  /** Counted; the number of scanned pallets differs from the list. Slide uses the scans. */
   | "unit-count-differs"
-  | "ignored-not-completed"
-  | "ignored-test"
-  | "ignored-cancelled";
+  /** Counted because pallets were scanned, although the list status is open or the reference says cancel. */
+  | "counted-open-status"
+  /** Open status and nothing scanned yet: not counted. */
+  | "not-handled"
+  /** Reference contains "test": not counted. */
+  | "ignored-test";
 
 export interface RideIssue {
   direction: Direction;
@@ -108,11 +114,13 @@ export function rideIssues(
   const issues: RideIssue[] = [];
   const inP = (d: DayKey | null) => d !== null && d >= period.from && d <= period.to;
   for (const direction of ["outbound", "inbound"] as const) {
+    // Scanned pallets per ride.
     const byRide = new Map<string, WmsUnit[]>();
     for (const u of units) {
       const rit = rideOf(u, direction);
-      if (rit) byRide.set(rit, [...(byRide.get(rit) ?? []), u]);
+      if (rit && directionalDate(u, direction)) byRide.set(rit, [...(byRide.get(rit) ?? []), u]);
     }
+    const counted = new Set(rides.filter((r) => r.direction === direction && r.listStatus === "counted").map((r) => r.ritNummer));
     const rideMap = new Map(rides.filter((r) => r.direction === direction).map((r) => [r.ritNummer, r]));
     const base = (ritNummer: string) => {
       const us = byRide.get(ritNummer) ?? [];
@@ -130,12 +138,13 @@ export function rideIssues(
       const b = base(p.ritNummer);
       const common = { ...b, plannedDate: p.plannedDate, status: p.status, referentie: p.referentie, listUnits: p.units };
       let kind: RideIssueKind | null = null;
-      if (p.isTest) kind = "ignored-test";
-      else if (p.isCancelled) kind = p.units > 0 || b.unitFileHus > 0 ? "ignored-cancelled" : null;
-      else if (p.units === 0) kind = null; // empty placeholder rows
-      else if (!p.completed) kind = "ignored-not-completed";
-      else if (b.unitFileHus === 0) kind = "missing-in-unit-file";
-      else if (b.unitFileHus !== p.units) kind = "unit-count-differs";
+      if (p.isTest) kind = p.units > 0 || b.unitFileHus > 0 ? "ignored-test" : null;
+      else if (counted.has(p.ritNummer)) {
+        if (!p.completed || p.isCancelled) kind = "counted-open-status";
+        else if (b.unitFileHus !== p.units) kind = "unit-count-differs";
+      } else if (p.units === 0 || (p.isCancelled && b.unitFileHus === 0)) kind = null; // placeholders and cancelled rides
+      else if (!p.completed) kind = "not-handled";
+      else kind = "missing-in-unit-file";
       if (kind) issues.push({ ...common, kind });
     }
     for (const r of rideMap.values()) {
