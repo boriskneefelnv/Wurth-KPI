@@ -9,11 +9,11 @@ en zendingen, berekent de operationele en klacht-KPI's en maakt de QBR-presentat
 De tool is een website die volledig in de browser draait: geen server, geen database. Alle bestanden
 blijven op de eigen computer.
 
-1. Draai **Te laden ritten** en **Te lossen ritten** voor de periode die je wilt laten zien en sleep ze
-   in de tool.
-2. De tool geeft aan voor welke laaddatums je het **unitoverzicht** moet draaien (4 maanden ervoor
-   t/m 1 maand erna). Draai dat (bij 50.000 rijen in delen) en sleep het erbij. De tool meldt of het
-   bereik gedekt is.
+1. Kies welke maanden je wilt laten zien en of je wilt vergelijken met de periode ervoor of vorig jaar.
+   De tool zegt welke drie exports je moet draaien: **Te laden ritten** en **Te lossen ritten** (verwachte
+   datum) en het **unitoverzicht** (laaddatum, met 4 maanden marge ervoor en 1 maand erna).
+2. Sleep de bestanden in (ook in delen). Per export zie je of hij compleet is; is een unitoverzicht
+   afgekapt op 50.000 rijen, dan staat erbij welk stuk je nog moet draaien.
 3. Controleer de aansluiting per maand en download zo nodig de controlelijst met afwijkende ritten.
 4. Kies de rapportsoort, periode en vergelijking.
 5. Klik op **Presenteren** (volledig scherm; ← → bladeren, G overzicht, F volledig scherm, Esc sluiten),

@@ -4,6 +4,7 @@ import { enrichWms, type EnrichValidation } from "../core/wms/enrich";
 import { parseRideList, type ParsedRideList } from "../core/wms/rideLists";
 import { readXlsx } from "../core/wms/xlsxReader";
 import { dayKey } from "../core/dates";
+import { fileSpan, type FileSpan } from "../core/wms/requirements";
 import type { WmsUnit } from "../core/types";
 
 export interface FileInfo {
@@ -12,8 +13,10 @@ export interface FileInfo {
   rows: number;
   /** Rows taken over from this file (unit exports overlap). */
   added?: number;
-  /** Ride lists: planned dates; unit overviews: Laaddatum range. */
-  dateRange?: { from: string; to: string } | null;
+  /** Ride lists: planned dates; unit overviews: Laaddatum range (stray dates ignored). */
+  span?: FileSpan | null;
+  /** The export has exactly the WMS row limit and is probably cut off. */
+  capped?: boolean;
   warning?: string;
   error?: string;
 }
@@ -31,18 +34,13 @@ interface Entry {
   list?: ParsedRideList;
 }
 
-function laaddatumRange(p: ParsedWms): { from: string; to: string } | null {
-  let from: string | null = null;
-  let to: string | null = null;
+function laaddatums(p: ParsedWms): string[] {
+  const out: string[] = [];
   for (const r of p.rows) {
     const v = r["Laaddatum"];
-    const d = v instanceof Date ? v : null;
-    if (!d) continue;
-    const k = dayKey(d);
-    if (from === null || k < from) from = k;
-    if (to === null || k > to) to = k;
+    if (v instanceof Date && !Number.isNaN(v.getTime())) out.push(dayKey(v));
   }
-  return from && to ? { from, to } : null;
+  return out;
 }
 
 /**
@@ -64,14 +62,14 @@ export class ExportStore {
         if (info.kind === "units") {
           entry.parsed = parseWmsSheets(sheets);
           info.rows = entry.parsed.rows.length;
-          info.dateRange = laaddatumRange(entry.parsed);
-          if (entry.parsed.rows.length >= WMS_EXPORT_ROW_LIMIT) {
-            info.warning = `Precies ${WMS_EXPORT_ROW_LIMIT.toLocaleString("nl-NL")} rijen: waarschijnlijk afgekapt door de WMS. Draai de periode in twee delen.`;
-          }
+          info.capped = entry.parsed.rows.length >= WMS_EXPORT_ROW_LIMIT;
+          info.span = fileSpan(laaddatums(entry.parsed), info.capped);
         } else if (info.kind) {
           entry.list = parseRideList(sheets, info.kind === "ride-list-outbound" ? "outbound" : "inbound");
           info.rows = entry.list.rawRowCount;
-          info.dateRange = entry.list.dateRange;
+          info.capped = entry.list.rawRowCount >= WMS_EXPORT_ROW_LIMIT;
+          const dates = entry.list.rides.map((r) => r.plannedDate).filter((d): d is string => d !== null).sort();
+          info.span = dates.length ? { from: dates[0]!, to: dates[dates.length - 1]!, capped: info.capped } : null;
         } else {
           info.error = "Niet herkend als unitoverzicht, Te laden of Te lossen.";
         }

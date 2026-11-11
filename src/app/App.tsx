@@ -10,7 +10,8 @@ import {
 import { comparisonOptionsWithQuality, LAADDATUM_LEAD_MONTHS, periodQuality, rideIssues, unitExportAdvice } from "../core/report/quality";
 import { reconcileRideLists } from "../core/report/reconcile";
 import { computeReportSet } from "../core/report/report";
-import { checkUnitExport, LEAD_MONTHS, lastScanDay, TRAIL_MONTHS, unitExportRange } from "../core/wms/exportRange";
+import { LEAD_MONTHS, lastScanDay, TRAIL_MONTHS } from "../core/wms/exportRange";
+import { exportRequirements, missingSpans, type DateSpan, type DisplayRange } from "../core/wms/requirements";
 import { coverageFromRideLists, indexPlannedRides } from "../core/wms/rideLists";
 import { materializeRides } from "../core/wms/rides";
 import { StaticRenderContext } from "../deck/anim";
@@ -30,6 +31,40 @@ const nl = (x: number) => x.toLocaleString("nl-NL");
 /** 2025-09-01 → 01-09-2025 (as typed in the WMS). */
 const nlDate = (k: string) => `${k.slice(8, 10)}-${k.slice(5, 7)}-${k.slice(0, 4)}`;
 const today = () => new Date().toISOString().slice(0, 10);
+
+/** Default: the last complete quarter, compared with the quarter before and the same quarter last year. */
+function defaultRange(): DisplayRange {
+  const d = new Date();
+  const q = Math.floor(d.getUTCMonth() / 3); // current quarter index
+  const start = new Date(Date.UTC(d.getUTCFullYear(), (q - 1) * 3, 1));
+  const end = new Date(Date.UTC(d.getUTCFullYear(), q * 3 - 1, 1));
+  const ym = (x: Date) => x.toISOString().slice(0, 7);
+  return { from: ym(start), to: ym(end), previous: true, lastYear: true };
+}
+const RANGE_KEY = "wurth-kpi-range";
+function loadRange(): DisplayRange {
+  try {
+    const r = JSON.parse(localStorage.getItem(RANGE_KEY) ?? "null") as DisplayRange | null;
+    if (r && /^\d{4}-\d{2}$/.test(r.from) && /^\d{4}-\d{2}$/.test(r.to)) return r;
+  } catch {
+    /* no storage */
+  }
+  return defaultRange();
+}
+function saveRange(r: DisplayRange) {
+  try {
+    localStorage.setItem(RANGE_KEY, JSON.stringify(r));
+  } catch {
+    /* no storage */
+  }
+}
+/** Report kind that matches the length of the shown range. */
+function kindFor(r: DisplayRange): ReportKind {
+  const [y1, m1] = r.from.split("-").map(Number) as [number, number];
+  const [y2, m2] = r.to.split("-").map(Number) as [number, number];
+  const n = (y2 - y1) * 12 + (m2 - m1) + 1;
+  return n <= 1 ? "month" : n <= 3 ? "quarter" : n <= 6 ? "half" : "year";
+}
 const pct = (x: number | null) => (x === null ? "" : `${(x * 100).toLocaleString("nl-NL", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`);
 
 function download(name: string, data: BlobPart, type: string) {
@@ -45,9 +80,21 @@ export function App() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [kind, setKind] = useState<ReportKind>("quarter");
+  const [range, setRange] = useState<DisplayRange>(loadRange);
+  useEffect(() => saveRange(range), [range]);
+  const updateRange = (patch: Partial<DisplayRange>) =>
+    setRange((r) => {
+      const next = { ...r, ...patch };
+      setKind(kindFor(next));
+      setChosen([...(next.previous ? (["previous"] as const) : []), ...(next.lastYear ? (["lastYear"] as const) : [])]);
+      return next;
+    });
+  const [kind, setKind] = useState<ReportKind>(() => kindFor(loadRange()));
   const [periodKey, setPeriodKey] = useState<string>("");
-  const [chosen, setChosen] = useState<ComparisonKind[]>(["previous", "lastYear"]);
+  const [chosen, setChosen] = useState<ComparisonKind[]>(() => {
+    const r = loadRange();
+    return [...(r.previous ? (["previous"] as const) : []), ...(r.lastYear ? (["lastYear"] as const) : [])];
+  });
   const [meetingDate, setMeetingDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [presenting, setPresenting] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -107,12 +154,14 @@ export function App() {
   }, [base, dataset]);
 
   // Only periods where the unit file matches the ride lists can be reported.
+  const req = useMemo(() => exportRequirements(range, today()), [range]);
+
   const { periods, unavailable } = useMemo(() => {
     if (!base || !quality) return { periods: [], unavailable: [] };
-    const all = availablePeriods(kind, base.coverage);
+    const all = availablePeriods(kind, base.coverage).filter((p) => p.from >= req.display.from && p.to <= req.display.to);
     const ok = all.filter((p) => quality(p).ok);
     return { periods: ok, unavailable: all.filter((p) => !ok.includes(p)) };
-  }, [base, quality, kind]);
+  }, [base, quality, kind, req]);
   useEffect(() => {
     if (periods.length && !periods.some((p) => p.key === periodKey)) setPeriodKey(periods[0]!.key);
   }, [periods, periodKey]);
@@ -139,15 +188,29 @@ export function App() {
     if (!base?.coverage || !dataset) return null;
     const full = customPeriod(base.coverage.from, base.coverage.to);
     const r = reconcileRideLists(dataset.units, base.planned, base.rides, full);
-    return r.inbound.perBucket.map((b, i) => ({ key: b.key, from: b.from, to: b.to, inbound: b, outbound: r.outbound.perBucket[i]! }));
-  }, [base, dataset]);
+    return r.inbound.perBucket
+      .map((b, i) => ({ key: b.key, from: b.from, to: b.to, inbound: b, outbound: r.outbound.perBucket[i]! }))
+      .filter((m) => m.to >= req.rides.from && m.from <= req.rides.to);
+  }, [base, dataset, req]);
 
-  // Which Laaddatum range the unit overview must cover, given the ride lists.
-  const exportAdvice = useMemo(() => (dataset?.lists.length ? unitExportRange(dataset.lists, today()) : null), [dataset]);
-  const exportCheck = useMemo(
-    () => (exportAdvice && dataset?.units.length ? checkUnitExport(dataset.units, exportAdvice) : null),
-    [exportAdvice, dataset],
-  );
+  // Per source: what has to be exported, and what is still missing.
+  const sources = useMemo(() => {
+    const files = dataset?.files ?? [];
+    const status = (kind: FileInfo["kind"], required: DateSpan) => {
+      const own = files.filter((f) => f.kind === kind);
+      const spans = own.flatMap((f) => (f.span ? [f.span] : []));
+      if (!own.length) return { loaded: false, missing: [] as DateSpan[], cutAt: [] as string[] };
+      // Days where a capped export stopped: a missing part starting there is caused by the 50.000-row limit.
+      const cutAt = spans.filter((sp) => sp.capped).map((sp) => sp.to);
+      return { loaded: true, missing: missingSpans(required, spans), cutAt };
+    };
+    return [
+      { kind: "ride-list-outbound" as const, label: "Te laden ritten", field: "Verwachte datum", required: req.rides, ...status("ride-list-outbound", req.rides) },
+      { kind: "ride-list-inbound" as const, label: "Te lossen ritten", field: "Verwachte datum", required: req.rides, ...status("ride-list-inbound", req.rides) },
+      { kind: "units" as const, label: "Unitoverzicht", field: "Laaddatum", required: req.units, ...status("units", req.units) },
+    ];
+  }, [dataset, req]);
+  const allComplete = sources.every((s) => s.loaded && s.missing.length === 0);
 
   // Months that do not match, and whether the unit export simply starts too late for them.
   const advice = useMemo(() => {
@@ -217,15 +280,76 @@ export function App() {
 
       <section className="panel">
         <div className="eyebrow">Stap 1</div>
-        <h2>Bestanden</h2>
-        <ol className="steps">
-          <li>
-            Draai <strong>Te laden ritten</strong> en <strong>Te lossen ritten</strong> voor de periode die je wilt laten zien (bijvoorbeeld
-            01-01-2026 t/m 30-06-2026) en sleep ze hieronder in.
-          </li>
-          <li>De tool zegt dan voor welke laaddatums je het <strong>unitoverzicht</strong> moet draaien. Sleep dat er daarna bij.</li>
-        </ol>
-        <p className="muted">Bestanden worden bij elkaar opgeteld; de tool herkent zelf wat wat is. Alles blijft op deze computer.</p>
+        <h2>Periode en bestanden</h2>
+        <div className="controls">
+          <label>
+            Laten zien van
+            <input type="month" value={range.from} max={range.to} onChange={(e) => e.target.value && updateRange({ from: e.target.value })} />
+          </label>
+          <label>
+            t/m
+            <input type="month" value={range.to} min={range.from} onChange={(e) => e.target.value && updateRange({ to: e.target.value })} />
+          </label>
+          <fieldset>
+            <legend>Vergelijken met</legend>
+            <label>
+              <input type="checkbox" checked={range.previous} onChange={(e) => updateRange({ previous: e.target.checked })} />
+              De periode ervoor
+            </label>
+            <label>
+              <input type="checkbox" checked={range.lastYear} onChange={(e) => updateRange({ lastYear: e.target.checked })} />
+              Dezelfde periode vorig jaar
+            </label>
+          </fieldset>
+        </div>
+
+        <div className={`advice ${allComplete ? "ok" : ""}`}>
+          <div className="eyebrow">Draai deze exports uit de WMS</div>
+          <table className="grid sources">
+            <thead>
+              <tr>
+                <th>Export</th>
+                <th>Filter op</th>
+                <th>Van</th>
+                <th>T/m</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sources.map((src) => (
+                <tr key={src.kind}>
+                  <td>
+                    <strong>{src.label}</strong>
+                  </td>
+                  <td>{src.field}</td>
+                  <td className="date">{nlDate(src.required.from)}</td>
+                  <td className="date">{nlDate(src.required.to)}</td>
+                  <td>
+                    {!src.loaded ? (
+                      <span className="muted">Nog niet ingeladen</span>
+                    ) : src.missing.length === 0 ? (
+                      <span className="ok">Compleet</span>
+                    ) : (
+                      <span className="warn">
+                        Nog draaien:{" "}
+                        {src.missing
+                          .map((m) => `${nlDate(m.from)} t/m ${nlDate(m.to)}${src.cutAt.includes(m.from) ? " (export afgekapt op 50.000 rijen)" : ""}`)
+                          .join(" en ")}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted">
+            Ritten: de maanden die je laat zien{range.previous || range.lastYear ? " plus de vergelijkingsperiode" : ""}. Unitoverzicht: de
+            laaddatum is de ophaaldatum bij de leverancier en ligt meestal weken vóór de rit, soms kort erna; daarom {LEAD_MONTHS} maanden
+            ervoor en {TRAIL_MONTHS} maand erna (99,97% van de pallets, gemeten over 2025 en 2026). Geeft de WMS precies 50.000 rijen, dan
+            meldt de tool welk stuk je nog moet draaien; sleep alle delen in, overlap telt niet dubbel.
+          </p>
+        </div>
+
         <label
           className="drop"
           onDragOver={(e) => e.preventDefault()}
@@ -237,40 +361,10 @@ export function App() {
           <input type="file" accept=".xlsx" multiple onChange={(e) => e.target.files && void load(e.target.files)} />
           <span>Bestanden kiezen of hierheen slepen</span>
         </label>
+        <p className="muted note">De tool herkent zelf welk bestand wat is. Alles blijft op deze computer.</p>
         {busy && <p className="busy">{busy}</p>}
         {error && <p className="error">{error}</p>}
-        {exportAdvice && (
-          <div className={`advice ${exportCheck?.ok ? "ok" : ""}`}>
-            <div className="eyebrow">Unitoverzicht draaien</div>
-            <p className="big">
-              Laaddatum van <strong>{nlDate(exportAdvice.from)}</strong> t/m <strong>{nlDate(exportAdvice.to)}</strong>
-            </p>
-            <p className="muted">
-              De ritten lopen van {nlDate(exportAdvice.rides.from)} t/m {nlDate(exportAdvice.rides.to)}. De laaddatum is de ophaaldatum bij de
-              leverancier en ligt meestal weken vóór de rit door het magazijn, soms ook kort erna. Daarom {LEAD_MONTHS} maanden ervoor en{" "}
-              {TRAIL_MONTHS} maand erna (zo valt 99,97% van de pallets erin, gemeten over 2025 en 2026). Geeft de WMS precies 50.000 rijen,
-              draai de periode dan in twee of meer delen en sleep ze allemaal in.
-            </p>
-            {exportCheck &&
-              (exportCheck.ok ? (
-                <p className="ok">
-                  De ingeladen unitoverzichten dekken dit (laaddatum {nlDate(exportCheck.loaded!.from)} t/m {nlDate(exportCheck.loaded!.to)}).
-                </p>
-              ) : (
-                <p className="warn">
-                  Nog niet gedekt:
-                  {exportCheck.missingStart && ` laaddatum ${nlDate(exportCheck.missingStart.from)} t/m ${nlDate(exportCheck.missingStart.to)}`}
-                  {exportCheck.missingStart && exportCheck.missingEnd && " en"}
-                  {exportCheck.missingEnd && ` laaddatum ${nlDate(exportCheck.missingEnd.from)} t/m ${nlDate(exportCheck.missingEnd.to)}`}. Draai dat
-                  deel erbij en sleep het in.
-                </p>
-              ))}
-          </div>
-        )}
         {dataset && dataset.files.length > 0 && <FileTable files={dataset.files} onRemove={removeFile} onClear={clearFiles} />}
-        {dataset && dataset.lists.length > 0 && dataset.units.length === 0 && (
-          <p className="muted">Sleep nu het unitoverzicht erbij.</p>
-        )}
       </section>
 
       {base && dataset && monthly && (
@@ -278,17 +372,17 @@ export function App() {
           <div className="eyebrow">Stap 2</div>
           <h2>Aansluiting</h2>
           <p className="muted">
-            Ritdata van {base.coverage?.from} t/m {base.coverage?.to}. Per maand: units op de rittenlijsten tegenover gescande pallets in het
+            Per maand: units op de rittenlijsten tegenover gescande pallets in het
             unitoverzicht. Wijkt een maand meer dan 2% af, dan is die periode niet bruikbaar als vergelijking.
           </p>
           {advice && (
             <div className="callout">
               <strong>
-                {advice.month} sluit niet aan omdat het unitoverzicht te laat begint (laaddatum vanaf {advice.firstLaaddatum}).
+                {advice.month} sluit niet aan omdat het unitoverzicht te laat begint (laaddatum vanaf {nlDate(advice.firstLaaddatum)}).
               </strong>{" "}
               De laaddatum is de ophaaldatum bij de leverancier en ligt weken voor de rit door het magazijn (tot ongeveer{" "}
               {LAADDATUM_LEAD_MONTHS} maanden). Pallets die eerder zijn opgehaald staan daardoor niet in het bestand. Exporteer het
-              unitoverzicht vanaf laaddatum <strong>{advice.exportFrom}</strong>; bij meer dan 50.000 rijen in twee delen, de tool voegt
+              unitoverzicht vanaf laaddatum <strong>{nlDate(advice.exportFrom)}</strong>; bij meer dan 50.000 rijen in twee delen, de tool voegt
               ze samen.
             </div>
           )}
@@ -323,7 +417,11 @@ export function App() {
               Controlelijst ritten downloaden (.xlsx)
             </button>
           )}
-          {dataRange && <span className="muted note">Ritten van {dataRange.from} t/m {dataRange.to}, de maanden waarvoor unitdata is.</span>}
+          {dataRange && (
+            <span className="muted note">
+              Ritten van {nlDate(dataRange.from)} t/m {nlDate(dataRange.to)}, de maanden waarvoor unitdata is.
+            </span>
+          )}
         </section>
       )}
 
@@ -429,8 +527,8 @@ function flag(x: number | null) {
 function FileTable({ files, onRemove, onClear }: { files: FileInfo[]; onRemove: (name: string) => void; onClear: () => void }) {
   const note = (f: FileInfo) => {
     if (f.error) return f.error;
-    if (f.warning) return f.warning;
-    const range = f.dateRange ? `${f.kind === "units" ? "Laaddatum" : "Ritten"} ${nlDate(f.dateRange.from)} t/m ${nlDate(f.dateRange.to)}` : "";
+    if (f.capped && f.span) return `Afgekapt op 50.000 rijen: bevat laaddatum ${nlDate(f.span.from)} t/m ${nlDate(f.span.to)} (laatste dag onvolledig)`;
+    const range = f.span ? `${f.kind === "units" ? "Laaddatum" : "Ritten"} ${nlDate(f.span.from)} t/m ${nlDate(f.span.to)}` : "";
     const overlap = f.added !== undefined && f.added < f.rows ? `; ${nl(f.rows - f.added)} rijen overlappen met een ander unitoverzicht` : "";
     return range + overlap;
   };
@@ -455,7 +553,7 @@ function FileTable({ files, onRemove, onClear }: { files: FileInfo[]; onRemove: 
             <td>{f.name}</td>
             <td>{f.kind ? FILE_KIND_LABEL[f.kind] : ""}</td>
             <td className="num">{nl(f.rows)}</td>
-            <td className={f.error || f.warning ? "warn" : "muted"}>{note(f)}</td>
+            <td className={f.error || f.capped ? "warn" : "muted"}>{note(f)}</td>
             <td className="num">
               <button className="link" onClick={() => onRemove(f.name)}>
                 Verwijderen

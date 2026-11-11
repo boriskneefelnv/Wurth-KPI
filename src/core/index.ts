@@ -35,3 +35,4 @@ export * from "./slides/format";
 export * from "./holidays";
 export * from "./wms/detect";
 export * from "./wms/exportRange";
+export * from "./wms/requirements";

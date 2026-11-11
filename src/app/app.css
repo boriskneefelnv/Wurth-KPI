@@ -292,3 +292,21 @@ button.link {
   font-size: 12px;
   text-decoration: underline;
 }
+input[type="month"] {
+  padding: 6px 8px;
+  border: 1px solid var(--hair);
+  border-radius: 3px;
+  font: inherit;
+  color: var(--navy);
+}
+.advice table.sources {
+  margin: 8px 0 10px;
+  background: transparent;
+}
+.sources td.date {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.advice {
+  max-width: none;
+}

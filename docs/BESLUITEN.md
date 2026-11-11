@@ -143,6 +143,14 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B75 | De HTML-export bevat dezelfde presentatiecomponent als de app (runtime + rapportdata + beelden in één bestand): zelfde toetsen, overzicht en animaties. Start met een startscherm omdat volledig scherm een klik vraagt. Afdrukken geeft één slide per pagina. |
 | B76 | Met de exports van 11 nov (laaddatum sep 2024 t/m nov 2026) sluit elke maand van jan 2025 t/m nov 2026 aan (99,5–100%). |
 
+## Eerst de periode, dan de exports (12 nov)
+
+| # | Besluit |
+|---|---|
+| B77 | Stap 1 begint met de periode die je wilt laten zien (maanden van/t/m) en of je wilt vergelijken met de periode ervoor en/of vorig jaar. De tool noemt dan de drie exports met filter en datums: Te laden en Te lossen op verwachte datum (getoonde maanden plus vergelijkingsmaanden), unitoverzicht op laaddatum (4 maanden ervoor t/m 1 maand erna). Nooit later dan vandaag. Vervangt B71 (advies pas na het inladen van de rittenlijsten). |
+| B78 | Per bron een status: nog niet ingeladen, compleet, of "nog draaien: van t/m". Bij een export van 50.000 rijen geldt de laatste dag als onvolledig en begint het ontbrekende stuk op die dag; overlap met een volgend deel telt niet dubbel. Losse uitschieterdatums (meer dan twee weken van de rest) en het laatste 0,1% van een afgekapt bestand worden genegeerd. Gaten tot een week aan de randen en tot twee weken tussen bestanden (weekend, kerst) worden niet gemeld. |
+| B79 | Rapportperiodes en de aansluitingstabel beperken zich tot de gekozen periode. De soort rapport volgt de lengte (1 maand: maand, 3: kwartaal, 6: half jaar, 12: jaar). De keuze wordt in de browser onthouden. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.
