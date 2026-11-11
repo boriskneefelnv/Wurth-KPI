@@ -4,15 +4,50 @@ Nieuwe versie van de Würth KPI- en QBR-module van Neele-Vat (eerder gebouwd in 
 De tool leest de WMS-export en de AFAS-klachtenexport in, koppelt klachten aan ritten
 en zendingen, berekent de operationele en klacht-KPI's en maakt de QBR-presentatie.
 
+## Gebruiken
+
+De tool is een website die volledig in de browser draait: geen server, geen database. Alle bestanden
+blijven op de eigen computer.
+
+1. Exporteer uit de WMS: **Unitoverzicht** (per half jaar, onder 50.000 rijen; laaddatum vanaf twee
+   maanden vóór de eerste rapportmaand), **Te laden ritten** en **Te lossen ritten**.
+2. Open de tool en sleep alle bestanden tegelijk in het venster. De tool herkent zelf welk bestand wat is.
+3. Controleer de aansluiting per maand en download zo nodig de controlelijst met afwijkende ritten.
+4. Kies de rapportsoort, periode en vergelijking. Download de slides als HTML of druk af als PDF.
+
+### Via localdeploy
+
+De repo volgt route B van localdeploy: `package.json` met `package-lock.json` in de hoofdmap, en
+`npm run build` (Vite) zet de site in `dist/` met `dist/index.html`. Er is geen backend, geen `.env`
+en geen `config.js` nodig. De build gebruikt relatieve paden, dus de site werkt onder elk pad.
+
+### Lokaal ontwikkelen
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+```bash
+npm run check
+```
+
+`check` draait de typecheck en alle tests. Echte exports horen in `data/` (staat in `.gitignore`).
+Logo en headerfoto staan in `assets/brand/` (niet in git, de repo is openbaar); zonder die bestanden
+gebruiken de slides een neutrale blauwe header en het logo als tekst.
+
 ## Status
 
-| Fase | Inhoud | Status |
-|---|---|---|
-| 1 | **Rekenkern + tests**: Excel inlezen, verrijken, ritdatum (5%-regel), alle KPI's, klachtenmatcher, klacht-KPI | ✅ klaar |
-| 2 | Slides één voor één uitwerken (volume ✅ rekenmodel, preview: `npx tsx scripts/preview-volume.ts <map>`) | bezig |
-| 3 | Supabase: één schone migratie, import in één transactie, RLS | gepland |
-| 4 | App (Vite + React + TypeScript): één workflow import → controle → klachten → rapport | gepland |
-| 5 | QBR-deck (21 slides, 1280×720, Neele-Vat-stijl) + export naar HTML, PDF en PPTX | gepland |
+| Onderdeel | Status |
+|---|---|
+| Rekenkern (inlezen, verrijken, ritdatum, KPI's, klachten) + tests | klaar |
+| Rittenlijsten, aansluitcontrole, controlelijst | klaar |
+| Browser-app (localdeploy) met volumeslides, export HTML en PDF | klaar |
+| Overige slides (on-time loading, dagvolume, container mix, opslag, kaart, profielen, voorraad, klachten) | slide voor slide |
+| Klachten (AFAS) in de app | gepland |
 
 ## Structuur
 
@@ -26,6 +61,10 @@ src/core/                 Pure rekenlogica (geen React/Supabase), volledig getes
   wms/rides.ts            Canonieke ritdatum (5%-regel), ritten en zendingen
   report/                 Operationele KPI's + computeReport()
   complaints/             Matcher, classificatie, klacht-KPI
+src/slides/               Slide-opmaak (HTML, huisstijl Neele-Vat)
+src/app/                  Browser-app (React): inladen in web worker, aansluiting, rapport, export
+index.html                Ingang van de website (Vite)
+scripts/                  Analyse en preview op de commandoregel (Node)
 tests/                    Vitest-tests per onderdeel
 docs/BESLUITEN.md         Afwijkingen t.o.v. Lovable en open vragen
 ```
@@ -41,15 +80,3 @@ const { rides, shipments } = materializeRides(units);
 const report = computeReport(units, ["2026-03", "2026-04"], {}, rides);
 ```
 
-## Ontwikkelen
-
-```bash
-npm install
-```
-
-```bash
-npm run check
-```
-
-`check` draait de typecheck en alle tests. Echte WMS- en AFAS-exports horen in `data/`
-(staat in `.gitignore`, want die bevatten klantgegevens).

@@ -18,8 +18,7 @@ import {
   type ComparisonKind,
   type ReportKind,
 } from "../src/core/period";
-import ExcelJS from "exceljs";
-import { comparisonOptionsWithQuality, periodQuality, rideIssues, type RideIssueKind } from "../src/core/report/quality";
+import { comparisonOptionsWithQuality, periodQuality, rideIssues } from "../src/core/report/quality";
 import { reconcileRideLists, reconcileVolume } from "../src/core/report/reconcile";
 import { computeReportSet } from "../src/core/report/report";
 import { volumeSlide, type VolumeSlideSubject } from "../src/core/slides/volume";
@@ -28,7 +27,9 @@ import { enrichWms } from "../src/core/wms/enrich";
 import { coverageFromRideLists, indexPlannedRides, parseRideList } from "../src/core/wms/rideLists";
 import { materializeRides } from "../src/core/wms/rides";
 import { readXlsx } from "../src/core/wms/xlsxReader";
-import { renderVolumeSlide, volumeDocument } from "./lib/renderVolume";
+import { renderVolumeSlide, volumeDocument } from "../src/slides/renderVolume";
+import { buildControlListXlsx, ISSUE_LABEL } from "../src/app/controlList";
+import { loadBrand } from "./lib/brand";
 
 const { values: args } = parseArgs({
   options: {
@@ -110,60 +111,18 @@ for (const s of subjects) {
   console.log(`            ${m.headline}`);
   if (m.subline) console.log(`            ${m.subline}`);
 }
+const brand = loadBrand();
 if (args.out) {
   mkdirSync(args.out, { recursive: true });
   const file = join(args.out, `volume-${period.key}.html`);
-  writeFileSync(file, volumeDocument(subjects.map((s, i) => renderVolumeSlide(volumeSlide(set, s), `${i + 4} / 21`)), `Volume ${period.label}`));
+  writeFileSync(file, volumeDocument(subjects.map((s, i) => renderVolumeSlide(volumeSlide(set, s), `${i + 4} / 21`, brand)), `Volume ${period.label}`));
   console.log(`\n${file}`);
 }
 
 if (args.issues) {
-  const LABEL: Record<RideIssueKind, string> = {
-    "missing-in-unit-file": "Telt niet mee: afgerond op lijst, geen gescande pallets",
-    "not-on-ride-list": "Telt niet mee: pallets gescand, rit niet op lijst",
-    "unit-count-differs": "Telt mee: aantal gescande pallets wijkt af van lijst",
-    "counted-open-status": "Telt mee: pallets gescand, status lijst nog open of cancel",
-    "not-handled": "Telt niet mee: status open, niets gescand",
-    "ignored-test": "Telt niet mee: testrit",
-  };
   const issues = rideIssues(enriched.units, planned, rides, period);
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Ritten om te controleren");
-  ws.columns = [
-    { header: "Richting", key: "dir", width: 10 },
-    { header: "Ritnummer", key: "rit", width: 15 },
-    { header: "Bevinding", key: "kind", width: 40 },
-    { header: "Verwachte datum", key: "planned", width: 15 },
-    { header: "Scandatum (5%)", key: "scan", width: 15 },
-    { header: "Status rittenlijst", key: "status", width: 22 },
-    { header: "Referentie", key: "ref", width: 22 },
-    { header: "Units rittenlijst", key: "list", width: 15 },
-    { header: "Gescande pallets", key: "hus", width: 17 },
-    { header: "Verschil", key: "diff", width: 10 },
-    { header: "Opdrachtgever", key: "opdr", width: 28 },
-    { header: "Dossiers (max 10)", key: "dos", width: 40 },
-  ];
-  for (const i of issues) {
-    ws.addRow({
-      dir: i.direction === "inbound" ? "Inkomend" : "Uitgaand",
-      rit: i.ritNummer,
-      kind: LABEL[i.kind],
-      planned: i.plannedDate ?? "",
-      scan: i.scanDate ?? "",
-      status: i.status ?? "",
-      ref: i.referentie ?? "",
-      list: i.listUnits ?? "",
-      hus: i.unitFileHus,
-      diff: i.listUnits === null ? "" : i.unitFileHus - i.listUnits,
-      opdr: i.opdrachtgevers.join(", "),
-      dos: i.dossiers.join(", "),
-    });
-  }
-  ws.getRow(1).font = { bold: true };
-  ws.views = [{ state: "frozen", ySplit: 1 }];
-  ws.autoFilter = { from: "A1", to: "L1" };
-  await wb.xlsx.writeFile(args.issues);
+  writeFileSync(args.issues, new Uint8Array(await buildControlListXlsx(issues)));
   const count: Record<string, number> = {};
-  for (const i of issues) count[LABEL[i.kind]] = (count[LABEL[i.kind]] ?? 0) + 1;
+  for (const i of issues) count[ISSUE_LABEL[i.kind]] = (count[ISSUE_LABEL[i.kind]] ?? 0) + 1;
   console.log(`\n${args.issues}`, count);
 }

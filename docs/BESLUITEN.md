@@ -103,6 +103,15 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B55 | Kop volumeslide: vergelijking met vorig jaar als die volume had, anders met de vorige periode. Op de Totaal-slide wordt de principal genoemd die de verandering verklaart (bv. AWKG, actief sinds sept 2025). |
 | B56 | Kop van de slide is niet handmatig aan te passen (besloten). Vier volumeslides blijven (WIAG, AWKG, Liqui Moly, Totaal). |
 
+## Browser-app voor localdeploy
+
+| # | Besluit |
+|---|---|
+| B57 | De tool is een statische website (Vite + React, route B van localdeploy): geen backend. Bestanden worden in een web worker in de browser gelezen en verlaten de computer niet. Supabase (oorspronkelijk plan) vervalt voorlopig. |
+| B58 | Alle exports tegelijk inslepen; het soort bestand wordt herkend aan de kolommen. Meerdere unitoverzichten worden samengevoegd. |
+| B59 | Alleen periodes die aansluiten (maximaal 2% verschil) zijn kiesbaar; de rest wordt met reden genoemd. Aansluiting = gescande pallets tegenover alle units die gescand hadden moeten zijn (meegetelde ritten plus afgeronde ritten zonder scans). |
+| B60 | Export: HTML-bestand met alle slides (los te openen, logo's ingebed) en afdrukken als PDF (één slide per pagina, 1280 × 720). |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

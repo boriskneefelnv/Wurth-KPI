@@ -127,8 +127,9 @@ describe("planned dates and the scan rule", () => {
       notHandled: { rides: 1, units: 5 },
       missingInUnitFile: { rides: 1, units: 50 },
       notOnList: { rides: 1, hus: 1 },
-      completeness: 1,
+      expectedUnits: 51, // 7002 (1) + 7003 (50, finished but nothing scanned)
     });
+    expect(r.completeness).toBeCloseTo(1 / 51);
     const q1 = reconcileRideLists(units, planned, rides, makePeriod("quarter", "2026-Q1")).outbound;
     expect(q1).toMatchObject({ listUnits: 3, matchedUnitFileHus: 3, completeness: 1, dateAgreement: { sameDay: 0, withinOneDay: 1, otherMonth: 1 } });
     expect(q1.perBucket.map((b) => [b.label, b.listUnits])).toEqual([["Jan", 0], ["Feb", 0], ["Mar", 3]]);

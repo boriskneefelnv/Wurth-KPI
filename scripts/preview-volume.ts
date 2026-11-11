@@ -11,7 +11,8 @@ import { join } from "node:path";
 import { makePeriod, eachDay, isWorkday } from "../src/core/period";
 import { computeReportSet } from "../src/core/report/report";
 import { volumeSlide, type VolumeSlideSubject } from "../src/core/slides/volume";
-import { renderVolumeSlide as render, volumeDocument } from "./lib/renderVolume";
+import { renderVolumeSlide, volumeDocument } from "../src/slides/renderVolume";
+import { loadBrand } from "./lib/brand";
 import { parseDateValue, periodOf } from "../src/core/dates";
 import { storageBucket } from "../src/core/wms/enrich";
 import type { Principal, WmsUnit } from "../src/core/types";
@@ -108,6 +109,8 @@ const units = syntheticUnits();
 const q2 = makePeriod("quarter", "2026-Q2");
 const set = computeReportSet(units, q2, ["previous", "lastYear"]);
 const subjects: VolumeSlideSubject[] = ["WIAG", "AWKG", "Liqui Moly", "Total"];
+const brand = loadBrand();
+const render = (m: ReturnType<typeof volumeSlide>, page: string) => renderVolumeSlide(m, page, brand);
 const slides = subjects.map((s, i) => render(volumeSlide(set, s), `${i + 4} / 21`));
 // Month report example (no ghost bars, weekly bars)
 const month = computeReportSet(units, makePeriod("month", "2026-06"), ["previous", "lastYear"]);

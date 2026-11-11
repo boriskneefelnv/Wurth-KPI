@@ -92,9 +92,11 @@ export function reconcileVolume(
 export interface RideListBucket {
   key: string;
   label: string;
-  /** Units on counted list rides with a planned date in this bucket. */
+  from: DayKey;
+  to: DayKey;
+  /** Units on the list that should have been scanned: counted rides plus finished rides without scans. */
   listUnits: number;
-  /** HUs in the unit file on those rides. */
+  /** Scanned pallets on those rides. */
   unitFileHus: number;
   /** unitFileHus / listUnits (0–1), null without list units. */
   completeness: number | null;
@@ -118,7 +120,9 @@ export interface RideListReconciliation {
   missingInUnitFile: { rides: number; units: number; examples: { ritNummer: string; plannedDate: DayKey; units: number }[] };
   /** Rides in the unit file, dated in the period by their scans, that are not on the list. */
   notOnList: { rides: number; hus: number };
-  /** HUs in the unit file / units on the list for the period (0–1). */
+  /** Units that should have been scanned: counted rides plus finished rides without any scan. */
+  expectedUnits: number;
+  /** Scanned pallets / expectedUnits (0–1). */
   completeness: number | null;
   /** Matched rides: planned date vs scan date (5% rule). */
   dateAgreement: { sameDay: number; withinOneDay: number; otherMonth: number };
@@ -194,13 +198,14 @@ export function reconcileRideLists(
           .map((r) => ({ ritNummer: r.ritNummer, plannedDate: r.plannedDate!, units: r.units })),
       },
       notOnList: { rides: notOnList.length, hus: notOnList.reduce((a, r) => a + r.huCount, 0) },
-      completeness: listUnits > 0 ? matchedHus / listUnits : null,
+      expectedUnits: listUnits + sum(missing),
+      completeness: listUnits + sum(missing) > 0 ? matchedHus / (listUnits + sum(missing)) : null,
       dateAgreement: agreement,
       perBucket: buckets.map((b) => {
         const inB = counted.filter((r) => inRange(r.plannedDate!, b));
-        const lu = sum(inB);
+        const lu = sum(inB) + sum(missing.filter((r) => inRange(r.plannedDate!, b)));
         const uh = inB.reduce((a, r) => a + (hus.get(r.ritNummer) ?? 0), 0);
-        return { key: b.key, label: b.label, listUnits: lu, unitFileHus: uh, completeness: lu > 0 ? uh / lu : null };
+        return { key: b.key, label: b.label, from: b.from, to: b.to, listUnits: lu, unitFileHus: uh, completeness: lu > 0 ? uh / lu : null };
       }),
     };
   };
