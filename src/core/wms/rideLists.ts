@@ -144,12 +144,15 @@ export interface RideFilter {
   excludeCancelled?: boolean;
   /** Default true: rides with 0 units are ignored. */
   excludeEmpty?: boolean;
+  /** Default true: rides that are not Geladen / Gelost (In afwachting, In transit, …) are ignored. */
+  excludeNotCompleted?: boolean;
 }
 
 export function isCountedRide(r: PlannedRide, f: RideFilter = {}): boolean {
   if ((f.excludeTest ?? true) && r.isTest) return false;
   if ((f.excludeCancelled ?? true) && r.isCancelled) return false;
   if ((f.excludeEmpty ?? true) && r.units === 0) return false;
+  if ((f.excludeNotCompleted ?? true) && !r.completed) return false;
   return r.plannedDate !== null;
 }
 

@@ -135,7 +135,7 @@ export function reconcileRideLists(
     const hus = new Map<string, number>();
     for (const u of units) {
       const rit = rideOf(u, direction);
-      if (rit && directionalDate(u, direction)) hus.set(rit, (hus.get(rit) ?? 0) + 1);
+      if (rit) hus.set(rit, (hus.get(rit) ?? 0) + 1);
     }
     const inP = [...planned[direction].values()].filter((r) => r.plannedDate && inRange(r.plannedDate, period));
     const counted = inP.filter((r) => isCountedRide(r, filter));

@@ -11,13 +11,14 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import {
-  availableComparisons,
   availablePeriods,
   makePeriod,
   REPORT_KINDS,
   type ComparisonKind,
   type ReportKind,
 } from "../src/core/period";
+import ExcelJS from "exceljs";
+import { comparisonOptionsWithQuality, periodQuality, rideIssues, type RideIssueKind } from "../src/core/report/quality";
 import { reconcileRideLists, reconcileVolume } from "../src/core/report/reconcile";
 import { computeReportSet } from "../src/core/report/report";
 import { volumeSlide, type VolumeSlideSubject } from "../src/core/slides/volume";
@@ -36,6 +37,7 @@ const { values: args } = parseArgs({
     period: { type: "string", default: "half:2026-H1" },
     compare: { type: "string", default: "" },
     out: { type: "string" },
+    issues: { type: "string" },
   },
 });
 if (!args.units || !args.laden || !args.lossen) throw new Error("--units, --laden en --lossen zijn verplicht");
@@ -67,9 +69,13 @@ console.log(`Ritten alleen op lijst (geen HU's in unitoverzicht): ${listOnlyRide
 const [kind, key] = args.period.split(":") as [ReportKind, string];
 const period = makePeriod(kind, key);
 const requested = (args.compare ? args.compare.split(",") : []) as ComparisonKind[];
-const allowed = availableComparisons(period, coverage);
-const comparisons = requested.filter((c) => allowed.includes(c));
-console.log(`\nRAPPORT ${period.label}  vergelijkingen mogelijk: ${allowed.join(", ") || "geen"}; gebruikt: ${comparisons.join(", ") || "geen"}`);
+const quality = (p: typeof period) => periodQuality(enriched.units, planned, rides, p);
+const options = comparisonOptionsWithQuality(period, coverage, quality);
+const comparisons = requested.filter((c) => options.find((o) => o.kind === c)?.usable);
+const q = quality(period);
+console.log(`\nRAPPORT ${period.label}  aansluiting unitoverzicht/rittenlijst: in ${pct(q.inbound)}, uit ${pct(q.outbound)} ${q.ok ? "OK" : "WAARSCHUWING"}`);
+for (const o of options) console.log(`  vergelijking ${o.kind} (${o.period.label}): ${o.usable ? "bruikbaar" : o.reason}`);
+console.log(`  gebruikt: ${comparisons.join(", ") || "geen"}`);
 
 const recList = reconcileRideLists(enriched.units, planned, rides, period);
 const recVol = reconcileVolume(enriched.units, v.rejected, rides, period);
@@ -92,11 +98,63 @@ console.log("");
 for (const s of subjects) {
   const m = volumeSlide(set, s);
   console.log(`${s.padEnd(11)} in ${n(m.inbound.totalHus)} HU / ${m.inbound.totalRides} ritten   uit ${n(m.outbound.totalHus)} HU / ${m.outbound.totalRides} ritten   [${m.outbound.hus.join(", ")}]`);
-  for (const t of m.insights) console.log(`            ▸ ${t}`);
+  console.log(`            ${m.headline}`);
+  if (m.subline) console.log(`            ${m.subline}`);
 }
 if (args.out) {
   mkdirSync(args.out, { recursive: true });
   const file = join(args.out, `volume-${period.key}.html`);
   writeFileSync(file, volumeDocument(subjects.map((s, i) => renderVolumeSlide(volumeSlide(set, s), `${i + 4} / 21`)), `Volume ${period.label}`));
   console.log(`\n${file}`);
+}
+
+if (args.issues) {
+  const LABEL: Record<RideIssueKind, string> = {
+    "missing-in-unit-file": "Op rittenlijst, geen HU's in unitoverzicht",
+    "not-on-ride-list": "In unitoverzicht, niet op rittenlijst",
+    "unit-count-differs": "Aantal units wijkt af",
+    "ignored-not-completed": "Niet afgerond (telt niet mee)",
+    "ignored-test": "Test (telt niet mee)",
+    "ignored-cancelled": "Cancel met units (telt niet mee)",
+  };
+  const issues = rideIssues(enriched.units, planned, rides, period);
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Ritten om te controleren");
+  ws.columns = [
+    { header: "Richting", key: "dir", width: 10 },
+    { header: "Ritnummer", key: "rit", width: 15 },
+    { header: "Bevinding", key: "kind", width: 40 },
+    { header: "Verwachte datum", key: "planned", width: 15 },
+    { header: "Scandatum (5%)", key: "scan", width: 15 },
+    { header: "Status rittenlijst", key: "status", width: 22 },
+    { header: "Referentie", key: "ref", width: 22 },
+    { header: "Units rittenlijst", key: "list", width: 15 },
+    { header: "HU's unitoverzicht", key: "hus", width: 17 },
+    { header: "Verschil", key: "diff", width: 10 },
+    { header: "Opdrachtgever", key: "opdr", width: 28 },
+    { header: "Dossiers (max 10)", key: "dos", width: 40 },
+  ];
+  for (const i of issues) {
+    ws.addRow({
+      dir: i.direction === "inbound" ? "Inkomend" : "Uitgaand",
+      rit: i.ritNummer,
+      kind: LABEL[i.kind],
+      planned: i.plannedDate ?? "",
+      scan: i.scanDate ?? "",
+      status: i.status ?? "",
+      ref: i.referentie ?? "",
+      list: i.listUnits ?? "",
+      hus: i.unitFileHus,
+      diff: i.listUnits === null ? "" : i.unitFileHus - i.listUnits,
+      opdr: i.opdrachtgevers.join(", "),
+      dos: i.dossiers.join(", "),
+    });
+  }
+  ws.getRow(1).font = { bold: true };
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+  ws.autoFilter = { from: "A1", to: "L1" };
+  await wb.xlsx.writeFile(args.issues);
+  const count: Record<string, number> = {};
+  for (const i of issues) count[LABEL[i.kind]] = (count[LABEL[i.kind]] ?? 0) + 1;
+  console.log(`\n${args.issues}`, count);
 }

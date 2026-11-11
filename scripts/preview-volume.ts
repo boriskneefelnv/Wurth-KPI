@@ -75,6 +75,7 @@ function unitOf(o: {
 }): WmsUnit {
   return {
     rowIndex: o.row,
+    sscc: "",
     referentie: "",
     dossiernummer: `D${o.row >> 3}`,
     inkomendeRit: o.inkomendeRit ?? null,

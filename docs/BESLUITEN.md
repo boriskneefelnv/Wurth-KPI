@@ -77,9 +77,20 @@ t.o.v. Lovable; graag bevestigen.**
 | B41 | Negatieve "Dagen in opslag" keurt de rij niet meer af (85 HU's in H1); alleen de opslagduur wordt leeg gelaten. |
 | B42 | Bevinding: Laaddatum en Losdatum in het unitoverzicht zijn zendingsdatums (ophalen bij leverancier / afleveren bij ontvanger), geen magazijndatums. Vertrek = verwachte datum van de uitgaande rit. Dit raakt dagvolume en inbound stocked (later bespreken). |
 
+## Eén databasis (na unitoverzicht okt 2025 t/m jun 2026)
+
+| # | Besluit |
+|---|---|
+| B43 | Exact dubbele rijen in het unitoverzicht (zelfde SSCC "Extern", zelfde ritten en scantijden) worden één keer geteld. In de export okt 2025 t/m jun 2026 waren dat 125 rijen. Een pallet die echt twee keer door het magazijn ging, blijft staan. |
+| B44 | Met rittenlijsten bepaalt de lijst welke ritten meetellen; HU's tellen alleen mee als hun rit meetelt, op de ritdatum. Ritten die niet op de lijst staan en HU's zonder rit gaan naar de controlelijst, niet naar de slide. Zo bestaan HU's en ritten uit dezelfde set. |
+| B45 | Ritten die niet afgerond zijn (In afwachting, In transit, Vrijgegeven) tellen niet mee. |
+| B46 | Aansluiting: HU's in het unitoverzicht mogen maximaal 2% afwijken van de units op de rittenlijsten. Anders volgt een waarschuwing en is de periode niet bruikbaar als vergelijking. |
+| B47 | Controlelijst per periode (Excel): ritten zonder HU's, ritten niet op de lijst, afwijkende aantallen, niet afgerond, test en cancel. |
+| B48 | Slides in de huisstijl van de Neele-Vat business update: headerfoto met tab, Maasvlakte-logo, label, kop en één ondersteunende regel, kerncijfers als rij, grafieken in kaarten. Engelse tekst met Nederlandse getalnotatie (11.615; 16,7). Geen streepjes of speciale tekens in lopende tekst: "up 12%", "down 4%", "stable" (minder dan 2%). |
+
 ## Open vragen
 
-1. **Opdrachtgevers**: H1-export bevat Liqui Moly GmbH, Adolf Würth GmbH & Co. KG en Würth Logistics AG. Is Würth Logistics AG = WIAG? (nu voorlopig zo ingesteld)
+1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.
 2. **On-time loading**: is "eerste HU op tijd weg" (huidig) echt de bedoeling, of moet de hele rit op tijd zijn (`latest`)?
 3. **Trefwoorden** voor warehouse en afwijkingen (`src/core/complaints/classify.ts`): controleren tegen echte klachten.
 4. **Feestdagen** meenemen in werkdag-gemiddelden?

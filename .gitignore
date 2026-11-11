@@ -7,3 +7,5 @@ coverage
 .DS_Store
 # lokale testdata (WMS/AFAS-exports bevatten klantgegevens)
 data/
+# merkbestanden (logo, headerfoto) niet in een openbare repo
+assets/brand/

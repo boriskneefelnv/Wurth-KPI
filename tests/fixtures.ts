@@ -20,6 +20,7 @@ export function unit(u: UnitInput = {}): WmsUnit {
   const dagen = u.dagenInOpslag ?? null;
   return {
     rowIndex: u.rowIndex ?? ++row,
+    sscc: u.sscc ?? "",
     referentie: u.referentie ?? "REF",
     dossiernummer: u.dossiernummer ?? "",
     inkomendeRit: u.inkomendeRit ?? null,

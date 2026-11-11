@@ -94,13 +94,22 @@ describe("planned dates", () => {
     expect(listOnlyRides.map((r) => r.ritNummer)).toEqual(["7003"]);
   });
 
-  it("counts HUs on the day of their ride; HUs without a ride on their scan", () => {
+  it("with ride lists only counted rides and their HUs take part, on the ride date", () => {
+    expect(rides.find((r) => r.ritNummer === "7001")!.listStatus).toBe("counted");
+    expect(rides.find((r) => r.ritNummer === "7002")!.listStatus).toBe("ignored"); // empty on the list
+    expect(rides.find((r) => r.ritNummer === "7009")!.listStatus).toBe("not-on-list");
     const april = computeVolume(buildContext(units, makePeriod("month", "2026-04"), {}, rides), "hus");
-    expect(april.outbound.Total.total).toBe(3); // 7002, 7009, no-ride
-    const march = computeVolume(buildContext(units, makePeriod("month", "2026-03"), {}, rides), "hus");
-    expect(march.outbound.Total.total).toBe(3);
+    expect(april.outbound.Total.total).toBe(0); // 7002 ignored, 7009 not on list, no-ride HU excluded
+    const march = computeVolume(buildContext(units, makePeriod("month", "2026-03"), {}, rides), "rides");
+    expect(march.outbound.Total.total).toBe(1);
     const byScan = computeVolume(buildContext(units, makePeriod("month", "2026-04"), { huDating: "scan" }, rides), "hus");
-    expect(byScan.outbound.Total.total).toBe(6);
+    expect(byScan.outbound.Total.total).toBe(3); // 7001's HUs on their own scan day
+  });
+
+  it("without ride lists HUs count on their ride date, HUs without a ride on their scan", () => {
+    const plain = materializeRides(units).rides;
+    const april = computeVolume(buildContext(units, makePeriod("month", "2026-04"), {}, plain), "hus");
+    expect(april.outbound.Total.total).toBe(6);
   });
 
   it("reconciles the list with the unit file", () => {
@@ -117,5 +126,33 @@ describe("planned dates", () => {
     const q1 = reconcileRideLists(units, planned, rides, makePeriod("quarter", "2026-Q1")).outbound;
     expect(q1).toMatchObject({ listUnits: 3, matchedUnitFileHus: 3, completeness: 1, dateAgreement: { sameDay: 0, withinOneDay: 1, otherMonth: 1 } });
     expect(q1.perBucket.map((b) => [b.label, b.listUnits])).toEqual([["Jan", 0], ["Feb", 0], ["Mar", 3]]);
+  });
+});
+
+describe("quality", () => {
+  it("only counts finished rides", async () => {
+    const { isCountedRide } = await import("@/core/wms/rideLists");
+    const list = parseRideList([laden([[1, "r", "In afwachting", 5, "2026-04-01"], [2, "r", "Geladen", 5, "2026-04-01"]])]);
+    expect(list.rides.map((r) => isCountedRide(r))).toEqual([false, true]);
+  });
+
+  it("offers a comparison only when the unit file matches the ride lists", async () => {
+    const { comparisonOptionsWithQuality, periodQuality } = await import("@/core/report/quality");
+    const planned = indexPlannedRides([
+      parseRideList([laden([[11, "r", "Geladen", 10, "2026-03-10"], [12, "r", "Geladen", 10, "2026-06-10"]])]),
+    ]);
+    const units = [
+      ...times(5, () => unit({ uitgaandeRit: "11", uitslag: "2026-03-10" })), // March: only 5 of 10
+      ...times(10, () => unit({ uitgaandeRit: "12", uitslag: "2026-06-10" })),
+    ];
+    const { rides } = materializeRides(units, { planned });
+    const q = (p: ReturnType<typeof makePeriod>) => periodQuality(units, planned, rides, p);
+    expect(q(makePeriod("month", "2026-06"))).toMatchObject({ outbound: 1, ok: true });
+    expect(q(makePeriod("month", "2026-03"))).toMatchObject({ outbound: 0.5, ok: false });
+    const opts = comparisonOptionsWithQuality(makePeriod("quarter", "2026-Q2"), { from: "2026-01-01", to: "2026-06-30" }, q);
+    expect(opts.map((o) => [o.kind, o.usable, o.reason])).toEqual([
+      ["previous", false, "Unitoverzicht sluit voor Q1 2026 niet aan op de rittenlijsten"],
+      ["lastYear", false, "Geen ritdata voor Q2 2025"],
+    ]);
   });
 });

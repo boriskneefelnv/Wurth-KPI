@@ -55,16 +55,22 @@ export function buildContext(
     }
   }
   const holidays = new Set(options.holidays ?? []);
-  const rideIndex = indexRides(rides ?? materializeRides(units).rides);
+  const allRides = rides ?? materializeRides(units).rides;
+  // With ride lists, only rides counted on the lists (and their HUs) take part.
+  const listsUsed = allRides.some((r) => r.listStatus !== "no-list");
+  const rideIndex = indexRides(allRides.filter(isCountable));
   const huDating = options.huDating ?? "ride";
   const unitDay = (u: WmsUnit, direction: Direction): DayKey | null => {
     const scan = directionalDate(u, direction);
-    if (!scan) return null;
-    if (huDating === "ride") {
-      const rit = rideOf(u, direction);
-      const ride = rit ? rideIndex[direction].get(rit) : undefined;
-      if (ride) return ride.canonicalDate;
+    const rit = rideOf(u, direction);
+    const ride = rit ? rideIndex[direction].get(rit) : undefined;
+    if (listsUsed) {
+      // The list decides: an HU counts when its ride is counted, on the ride's date.
+      if (!ride) return null;
+      return huDating === "ride" || !scan ? ride.canonicalDate : dayKey(scan);
     }
+    if (!scan) return null;
+    if (huDating === "ride" && ride) return ride.canonicalDate;
     return dayKey(scan);
   };
   return {
@@ -83,6 +89,11 @@ export function buildContext(
       return k !== null && inRange(k, period);
     },
   };
+}
+
+/** Rides that take part in the KPIs (see Ride.listStatus). */
+export function isCountable(r: Ride): boolean {
+  return r.listStatus === "counted" || r.listStatus === "no-list";
 }
 
 /** Rides of a direction whose canonical day falls in the report period. */

@@ -93,7 +93,7 @@ export function classifyShipmentType(containertype: string, seals: readonly stri
 // Enrichment
 // ---------------------------------------------------------------------------
 
-export type RejectReason = "status" | "no-dates" | "invalid-weight";
+export type RejectReason = "status" | "no-dates" | "invalid-weight" | "duplicate";
 
 export interface RejectedRow {
   rowIndex: number;
@@ -160,10 +160,30 @@ export function enrichWms(parsed: ParsedWms, options: EnrichOptions = {}): Enric
   }
 
   const periods = new Set<Period>();
+  // Exact duplicates: same pallet (SSCC), same rides and same scan moments.
+  // The export sometimes lists a pallet twice; a pallet that genuinely passed
+  // twice (other rides or times) is kept.
+  const seen = new Map<string, number>();
 
   for (const row of parsed.rows) {
     const unit = enrichRow(row, map, validation);
     if (!unit) continue;
+    if (unit.sscc) {
+      const key = [unit.sscc, unit.inkomendeRit, unit.uitgaandeRit, unit.inslagUnit?.getTime(), unit.uitslagUnit?.getTime()].join("|");
+      const first = seen.get(key);
+      if (first !== undefined) {
+        validation.rejected.push({
+          rowIndex: unit.rowIndex,
+          reason: "duplicate",
+          detail: `Dubbel met rij ${first} (SSCC ${unit.sscc})`,
+          inslagUnit: unit.inslagUnit,
+          uitslagUnit: unit.uitslagUnit,
+          opdrachtgever: unit.opdrachtgever,
+        });
+        continue;
+      }
+      seen.set(key, unit.rowIndex);
+    }
     units.push(unit);
     if (unit.inboundPeriod) periods.add(unit.inboundPeriod);
     if (unit.outboundPeriod) periods.add(unit.outboundPeriod);
@@ -242,6 +262,7 @@ function enrichRow(row: RawWmsRow, map: Readonly<Record<string, Principal>>, v: 
 
   return {
     rowIndex: row.__rowIndex,
+    sscc: str(row["sscc"]),
     referentie: str(row["Referentie"]),
     dossiernummer: str(row["Dossiernummer"]),
     inkomendeRit: normalizeRide(row["Inkomende rit"]),

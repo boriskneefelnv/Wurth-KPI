@@ -38,7 +38,7 @@ describe("volume slide model", () => {
 
   it("total slide: HUs and rides per month, ghost bars from last year", () => {
     const m = volumeSlide(set, "Total");
-    expect(m.title).toBe("Volume — Total");
+    expect(m.title).toBe("Volume total");
     expect(m.buckets.map((b) => b.label)).toEqual(["Apr", "May", "Jun"]);
     expect(m.ghost).toEqual({ kind: "lastYear", label: "Q2 2025" });
     expect(m.outbound.hus).toEqual([20, 50, 80]);
@@ -57,12 +57,11 @@ describe("volume slide model", () => {
     expect(m.inbound.comparisons[1]).toMatchObject({ hus: 80, husDeltaPct: -25 });
   });
 
-  it("writes a short English insight with the driver of the change", () => {
-    const [first, second] = volumeSlide(set, "Total").insights;
-    expect(first).toBe(
-      "Outbound +50% vs Q2 2025 (150 HUs), inbound −25% (60 HUs); outbound change mainly from more HUs to FR (+50).",
-    );
-    expect(second).toMatch(/^Busiest day: 05-05 with 60 HUs in/);
+  it("writes a short headline and a supporting line without dashes", () => {
+    const m = volumeSlide(set, "Total");
+    expect(m.headline).toBe("Outbound up 50% on Q2 2025, inbound down 25%.");
+    expect(m.subline).toBe("The outbound increase comes mainly from France (50 more HUs). Busiest day was 5 May with 60 HUs in.");
+    expect(`${m.headline} ${m.subline}`).not.toMatch(/[\u2013\u2014\u2212]/);
   });
 
   it("principal slide only counts that principal", () => {
@@ -88,7 +87,7 @@ describe("volume slide model", () => {
 
   it("without comparison it describes the period itself", () => {
     const m = volumeSlide(computeReportSet(units, q2, []), "Total");
-    expect(m.insights[0]).toBe("60 HUs in on 1 ride, 150 HUs out on 5 rides.");
+    expect(m.headline).toBe("150 HUs out on 5 rides, 60 HUs in on 1 ride.");
   });
 });
 

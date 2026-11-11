@@ -3,6 +3,7 @@ import type { DayKey, Direction, MainPrincipal } from "../types";
 import { deltaPct } from "../report/context";
 import type { OperationalReport, ReportSet } from "../report/report";
 import type { SeriesKey } from "../report/workload";
+import { changeWords, countryName, fmtDay, fmtInt, plural } from "./format";
 
 /**
  * View model for a volume slide (design A: inbound and outbound panels).
@@ -46,8 +47,10 @@ export interface VolumeSlideModel {
   ghost: { kind: ComparisonKind; label: string } | null;
   inbound: VolumePanel;
   outbound: VolumePanel;
-  /** 0–2 short English sentences for the slide footer. */
-  insights: string[];
+  /** One English sentence: the main change (or the totals without comparison). */
+  headline: string;
+  /** Supporting sentence(s): driver of the change and busiest day. */
+  subline: string | null;
 }
 
 const SUBJECT_KEY: Record<VolumeSlideSubject, SeriesKey> = {
@@ -98,11 +101,7 @@ function panel(set: ReportSet, key: SeriesKey, direction: Direction, ghost: Oper
   };
 }
 
-const n = (x: number) => Math.round(x).toLocaleString("en-GB");
-const rides = (x: number) => `${n(x)} ${x === 1 ? "ride" : "rides"}`;
-const signed = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(Math.round(x))}%`;
-
-/** Country with the largest absolute change in outbound HUs, if it explains ≥ 40% of the change. */
+/** Country with the largest absolute change in outbound HUs, if it explains at least 40% of the change. */
 function outboundDriver(set: ReportSet, key: SeriesKey, comparison: OperationalReport): { country: string; delta: number } | null {
   const husIn = (r: OperationalReport) => {
     const m = new Map<string, number>();
@@ -121,37 +120,38 @@ function outboundDriver(set: ReportSet, key: SeriesKey, comparison: OperationalR
   return best && Math.abs(best.delta) >= 0.4 * Math.abs(total) ? best : null;
 }
 
-function insightsFor(set: ReportSet, key: SeriesKey, inbound: VolumePanel, outbound: VolumePanel): string[] {
-  const out: string[] = [];
-  // Primary comparison for the text: same period last year if available, else previous.
+/**
+ * Headline: the change against the primary comparison (same period last year
+ * if available, else the previous period); without comparison the totals.
+ * Subline: what drives the outbound change, and the busiest day.
+ */
+function texts(set: ReportSet, key: SeriesKey, inbound: VolumePanel, outbound: VolumePanel): { headline: string; subline: string | null } {
   const primary = set.comparisons.find((c) => c.kind === "lastYear") ?? set.comparisons[0];
-  if (primary) {
-    const o = outbound.comparisons.find((c) => c.kind === primary.kind)!;
-    const i = inbound.comparisons.find((c) => c.kind === primary.kind)!;
+  let headline: string;
+  const extra: string[] = [];
+  const o = primary ? outbound.comparisons.find((c) => c.kind === primary.kind)! : null;
+  const i = primary ? inbound.comparisons.find((c) => c.kind === primary.kind)! : null;
+  if (primary && (o?.husDeltaPct != null || i?.husDeltaPct != null)) {
     const parts: string[] = [];
-    if (o.husDeltaPct !== null) parts.push(`Outbound ${signed(o.husDeltaPct)} ${o.label} (${n(outbound.totalHus)} HUs)`);
-    if (i.husDeltaPct !== null) parts.push(`inbound ${signed(i.husDeltaPct)} (${n(inbound.totalHus)} HUs)`);
-    if (parts.length) {
-      let sentence = parts.join(", ");
-      const driver = outboundDriver(set, key, primary.report);
-      if (driver && o.husDeltaPct !== null && Math.abs(o.husDeltaPct) >= 5) {
-        sentence += `; outbound change mainly ${driver.delta > 0 ? "from more" : "from fewer"} HUs to ${driver.country} (${driver.delta > 0 ? "+" : "−"}${n(Math.abs(driver.delta))})`;
-      }
-      out.push(`${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`);
+    if (o?.husDeltaPct != null) parts.push(`Outbound ${changeWords(o.husDeltaPct)} on ${primary.report.period.label}`);
+    if (i?.husDeltaPct != null) parts.push(`${parts.length ? "inbound" : "Inbound"} ${changeWords(i.husDeltaPct)}${parts.length ? "" : ` on ${primary.report.period.label}`}`);
+    headline = `${parts.join(", ")}.`;
+    const driver = outboundDriver(set, key, primary.report);
+    if (driver && o?.husDeltaPct != null && Math.abs(o.husDeltaPct) >= 5) {
+      extra.push(
+        driver.delta > 0
+          ? `The outbound increase comes mainly from ${countryName(driver.country)} (${fmtInt(driver.delta)} more HUs).`
+          : `The outbound decrease comes mainly from ${countryName(driver.country)} (${fmtInt(-driver.delta)} fewer HUs).`,
+      );
     }
-  } else if (outbound.totalHus + inbound.totalHus > 0) {
-    out.push(`${n(inbound.totalHus)} HUs in on ${rides(inbound.totalRides)}, ${n(outbound.totalHus)} HUs out on ${rides(outbound.totalRides)}.`);
+  } else {
+    headline = `${plural(outbound.totalHus, "HU", "HUs")} out on ${plural(outbound.totalRides, "ride", "rides")}, ${plural(inbound.totalHus, "HU", "HUs")} in on ${plural(inbound.totalRides, "ride", "rides")}.`;
   }
-  const peak = [inbound, outbound]
-    .filter((p) => p.peakDay)
-    .sort((a, b) => b.peakDay!.hus - a.peakDay!.hus)[0];
-  if (peak?.peakDay && peak.husPerWorkday) {
-    const d = peak.peakDay.day;
-    out.push(
-      `Busiest day: ${d.slice(8)}-${d.slice(5, 7)} with ${n(peak.peakDay.hus)} HUs ${peak.direction === "inbound" ? "in" : "out"} (average ${n(peak.husPerWorkday)} per workday).`,
-    );
+  const peak = [inbound, outbound].filter((p) => p.peakDay).sort((a, b) => b.peakDay!.hus - a.peakDay!.hus)[0];
+  if (peak?.peakDay) {
+    extra.push(`Busiest day was ${fmtDay(peak.peakDay.day)} with ${plural(peak.peakDay.hus, "HU", "HUs")} ${peak.direction === "inbound" ? "in" : "out"}.`);
   }
-  return out;
+  return { headline, subline: extra.length ? extra.join(" ") : null };
 }
 
 export function volumeSlide(set: ReportSet, subject: VolumeSlideSubject): VolumeSlideModel {
@@ -161,12 +161,12 @@ export function volumeSlide(set: ReportSet, subject: VolumeSlideSubject): Volume
   const outbound = panel(set, key, "outbound", ghost?.report ?? null);
   return {
     subject,
-    title: `Volume — ${subject}`,
+    title: subject === "Total" ? "Volume total" : `Volume ${subject}`,
     period: set.current.period,
     buckets: set.current.perspectives.hus.volume.buckets.map(({ key: k, label }) => ({ key: k, label })),
     ghost: ghost ? { kind: ghost.kind, label: ghost.report.period.label } : null,
     inbound,
     outbound,
-    insights: insightsFor(set, key, inbound, outbound),
+    ...texts(set, key, inbound, outbound),
   };
 }

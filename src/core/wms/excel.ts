@@ -26,7 +26,7 @@ export interface ParsedWms {
   headerRow: number;
   missingRequired: string[];
   /** Optional columns that were found, by canonical name. */
-  optionalFound: { vertrek: string | null; losdatum: string | null };
+  optionalFound: { vertrek: string | null; losdatum: string | null; sscc: string | null };
 }
 
 export class WmsParseError extends Error {
@@ -107,8 +107,8 @@ export function parseWmsSheets(sheets: SheetData[]): ParsedWms {
     );
   }
 
-  const optionalFound: ParsedWms["optionalFound"] = { vertrek: null, losdatum: null };
-  for (const key of ["vertrek", "losdatum"] as const) {
+  const optionalFound: ParsedWms["optionalFound"] = { vertrek: null, losdatum: null, sscc: null };
+  for (const key of ["vertrek", "losdatum", "sscc"] as const) {
     for (const alias of OPTIONAL_COLUMN_ALIASES[key]) {
       const idx = headerNorm.indexOf(norm(alias));
       if (idx !== -1) {

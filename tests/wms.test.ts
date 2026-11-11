@@ -41,7 +41,7 @@ describe("parseWmsSheets", () => {
     const parsed = parseWmsSheets([sheet([row({})], "Export WMS", [["Rapport WMS"], []])]);
     expect(parsed.headerRow).toBe(3);
     expect(parsed.rows[0]!.__rowIndex).toBe(4);
-    expect(parsed.optionalFound).toEqual({ vertrek: "Vertrek", losdatum: "Losdatum" });
+    expect(parsed.optionalFound).toEqual({ vertrek: "Vertrek", losdatum: "Losdatum", sscc: null });
   });
 
   it("picks the sheet with the best header match", () => {
@@ -171,5 +171,19 @@ describe("readXlsx", () => {
     const res = enrichWms(parsed);
     expect(res.units[0]).toMatchObject({ brutoKg: 250, inboundPeriod: "2026-03" });
     expect(res.units[0]!.inslagUnit!.toISOString()).toBe("2026-03-20T10:00:00.000Z");
+  });
+});
+
+describe("duplicate rows", () => {
+  const H = [...HEADERS, "Extern"];
+  const r = (extern: string, values: Partial<Record<(typeof HEADERS)[number], unknown>> = {}) => [...row(values), extern];
+  it("drops exact duplicates (same SSCC, rides and scans) and keeps a pallet that passed twice", () => {
+    const s: SheetData = {
+      name: "S",
+      rows: [H, r("003401"), r("003401"), r("003401", { "Uitgaande rit": "OUT2", "Uitslag Unit": "2026-05-02 08:00" }), r(""), r("")],
+    };
+    const res = enrichWms(parseWmsSheets([s]));
+    expect(res.units).toHaveLength(4);
+    expect(res.validation.rejected).toEqual([expect.objectContaining({ rowIndex: 3, reason: "duplicate" })]);
   });
 });

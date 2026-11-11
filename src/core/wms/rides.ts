@@ -133,6 +133,7 @@ export function materializeRides(units: readonly WmsUnit[], options: Materialize
         canonicalDate: date.canonicalDate,
         scanDate: scans?.canonicalDate ?? date.canonicalDate,
         plannedUnits: plan ? plan.units : null,
+        listStatus: !plannedIdx ? "no-list" : !plan ? "not-on-list" : usePlan ? "counted" : "ignored",
         period: date.period,
         dateResolution: date.resolution,
         outlierHuCount: date.outlierHuCount,

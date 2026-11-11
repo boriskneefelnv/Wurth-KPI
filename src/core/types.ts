@@ -38,6 +38,8 @@ export type Perspective = "hus" | "rides";
 export interface WmsUnit {
   /** 1-based row number in the source sheet (header row = 1). */
   rowIndex: number;
+  /** Pallet barcode (column "Extern"), empty when unknown. */
+  sscc: string;
   referentie: string;
   dossiernummer: string;
   /** Normalised ride id; empty and "0" become null. */
@@ -89,6 +91,13 @@ export interface Ride {
   scanDate: DayKey;
   /** Units according to the ride list (null when the ride is not on a list). */
   plannedUnits: number | null;
+  /**
+   * Relation to the ride lists. `counted`: on a list and counted; `ignored`: on
+   * a list but test/cancel/empty/not finished; `not-on-list`: lists were given
+   * but this ride is not on them; `no-list`: no ride lists were given.
+   * With ride lists only `counted` rides (and their HUs) are in the KPIs.
+   */
+  listStatus: "counted" | "ignored" | "not-on-list" | "no-list";
   period: Period;
   dateResolution: DateResolution;
   outlierHuCount: number;
