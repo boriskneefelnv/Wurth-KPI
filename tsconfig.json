@@ -16,5 +16,5 @@
     "types": ["node", "vitest/globals"],
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src", "tests"]
+  "include": ["src", "tests", "scripts"]
 }

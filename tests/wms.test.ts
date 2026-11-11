@@ -76,7 +76,7 @@ describe("parseWmsSheets", () => {
 describe("enrichWms", () => {
   const enrich = (rows: unknown[][]) => enrichWms(parseWmsSheets([sheet(rows)]));
 
-  it("rejects excluded statuses, empty dates, negative storage and bad weights", () => {
+  it("rejects excluded statuses, empty dates and bad weights; keeps negative storage", () => {
     const res = enrich([
       row({ Omschrijving: "Cancel" }),
       row({ Omschrijving: " manual adjustment " }),
@@ -86,12 +86,14 @@ describe("enrichWms", () => {
       row({ "Bruto kg": null }),
       row({}),
     ]);
-    expect(res.units).toHaveLength(1);
+    // Negative storage is kept (it is a real HU movement) without storage days.
+    expect(res.units).toHaveLength(2);
+    expect(res.units[0]).toMatchObject({ dagenInOpslag: null, storageBucket: null });
+    expect(res.validation.negativeStorage).toEqual([{ rowIndex: 5, days: -1 }]);
     expect(res.validation.rejected.map((r) => r.reason)).toEqual([
       "status",
       "status",
       "no-dates",
-      "negative-storage",
       "invalid-weight",
       "invalid-weight",
     ]);

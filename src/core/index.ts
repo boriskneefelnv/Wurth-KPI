@@ -29,3 +29,4 @@ export * from "./complaints/kpi";
 export * from "./period";
 export * from "./report/reconcile";
 export * from "./slides/volume";
+export * from "./wms/rideLists";

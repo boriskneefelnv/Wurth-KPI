@@ -65,10 +65,21 @@ t.o.v. Lovable; graag bevestigen.**
 | B34 | Controle-overzicht per periode en richting (`reconcileVolume`): rijen in bestand → afgekeurd per reden → meegeteld, opdrachtgevers die onder "Overig" vallen, HU's zonder rit, en ritten die door de ritdatum in een andere periode tellen. |
 | B35 | Voorraad: voorlopig een momentopname aan het eind van elke staaf plus de verandering over de periode. Wordt besproken bij de voorraadslide. |
 
+## Rittenlijsten (Te laden / Te lossen), na analyse van de H1 2026-exports
+
+| # | Besluit |
+|---|---|
+| B36 | De rittenlijsten zijn een vaste bron naast het unitoverzicht. **Verwachte datum is leidend voor de ritdatum**; zonder lijst valt de rit terug op de 5%-regel op scans. De scandatum blijft bewaard ter controle. |
+| B37 | HU's tellen in de periode van hun rit (optie `huDating: "ride"`, standaard), zodat HU's en ritten altijd in dezelfde maand vallen. HU's zonder rit tellen op hun eigen scan. |
+| B38 | Meerdere regels per rit in een lijst worden samengevoegd: units opgeteld, datum en status van de regel met de meeste units. Ritten met "TEST" of "CANCEL" in de referentie of met 0 units tellen niet mee. |
+| B39 | De dekking (welke periodes kiesbaar zijn) komt uit de rittenlijsten, afgerond op hele maanden; bij import te bevestigen. Het unitoverzicht is daarvoor ongeschikt: het is gefilterd op Laaddatum (ophaaldatum bij de leverancier). |
+| B40 | Controle-overzicht per periode/maand: units volgens de lijst vs HU's in het unitoverzicht (volledigheid), ritten die ontbreken, ritten die niet op de lijst staan, en datum lijst vs scans. |
+| B41 | Negatieve "Dagen in opslag" keurt de rij niet meer af (85 HU's in H1); alleen de opslagduur wordt leeg gelaten. |
+| B42 | Bevinding: Laaddatum en Losdatum in het unitoverzicht zijn zendingsdatums (ophalen bij leverancier / afleveren bij ontvanger), geen magazijndatums. Vertrek = verwachte datum van de uitgaande rit. Dit raakt dagvolume en inbound stocked (later bespreken). |
+
 ## Open vragen
 
-1. **Opdrachtgevers**: welke exacte namen staan in de kolom *Opdrachtgever*? De mapping in
-   `src/core/constants.ts` is nu een placeholder. Volgt uit de WMS-export.
+1. **Opdrachtgevers**: H1-export bevat Liqui Moly GmbH, Adolf Würth GmbH & Co. KG en Würth Logistics AG. Is Würth Logistics AG = WIAG? (nu voorlopig zo ingesteld)
 2. **On-time loading**: is "eerste HU op tijd weg" (huidig) echt de bedoeling, of moet de hele rit op tijd zijn (`latest`)?
 3. **Trefwoorden** voor warehouse en afwijkingen (`src/core/complaints/classify.ts`): controleren tegen echte klachten.
 4. **Feestdagen** meenemen in werkdag-gemiddelden?

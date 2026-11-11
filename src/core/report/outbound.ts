@@ -38,7 +38,7 @@ export function computeOutbound(ctx: ReportContext): OutboundBlock {
   let totalHus = 0;
   let totalKg = 0;
   for (const u of ctx.units) {
-    if (!ctx.inPeriod(u.uitslagUnit)) continue;
+    if (!ctx.unitInPeriod(u, "outbound")) continue;
     totalHus++;
     totalKg += u.brutoKg;
     const c = country(u.losLand ?? "Onbekend");
@@ -82,7 +82,7 @@ export function computeOutbound(ctx: ReportContext): OutboundBlock {
 export function principalCountryHus(ctx: ReportContext, principal: Principal): Map<string, number> {
   const m = new Map<string, number>();
   for (const u of ctx.units) {
-    if (u.principal !== principal || !ctx.inPeriod(u.uitslagUnit)) continue;
+    if (u.principal !== principal || !ctx.unitInPeriod(u, "outbound")) continue;
     inc(m, u.losLand ?? "Onbekend");
   }
   return m;

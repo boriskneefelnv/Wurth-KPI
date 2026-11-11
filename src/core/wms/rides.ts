@@ -1,6 +1,7 @@
 import { principalSortKey, RIDE_DATE_THRESHOLD } from "../constants";
 import { dayKey, periodOfDayKey } from "../dates";
 import type { DayKey, Direction, Principal, Ride, RideDate, Shipment, WmsUnit } from "../types";
+import { isCountedRide, type PlannedRide, type PlannedRideIndex, type RideFilter } from "./rideLists";
 
 /**
  * Canonical day of a ride (or shipment) from the dates of its HUs.
@@ -69,18 +70,27 @@ function mostCommon<T>(values: Iterable<T>): T | null {
 export interface MaterializeResult {
   rides: Ride[];
   shipments: Shipment[];
-  /** Rides without any dated HU; they cannot be placed in a period. */
+  /** Rides without any dated HU and without a planned date; they cannot be placed in a period. */
   undatedRides: { direction: Direction; ritNummer: string; huCount: number }[];
+  /** Counted rides from the ride lists that have no HUs in the unit file. */
+  listOnlyRides: PlannedRide[];
+}
+
+export interface MaterializeOptions {
+  /** Ride lists (Te laden / Te lossen). Their Verwachte datum is leading. */
+  planned?: PlannedRideIndex;
+  rideFilter?: RideFilter;
 }
 
 /**
  * Build rides and shipments for both directions from the full unit set.
  * Units without a ride number for a direction do not belong to a ride there.
  */
-export function materializeRides(units: readonly WmsUnit[]): MaterializeResult {
+export function materializeRides(units: readonly WmsUnit[], options: MaterializeOptions = {}): MaterializeResult {
   const rides: Ride[] = [];
   const shipments: Shipment[] = [];
   const undatedRides: MaterializeResult["undatedRides"] = [];
+  const listOnlyRides: PlannedRide[] = [];
 
   for (const direction of ["inbound", "outbound"] as const) {
     const byRide = new Map<string, WmsUnit[]>();
@@ -92,19 +102,37 @@ export function materializeRides(units: readonly WmsUnit[]): MaterializeResult {
       list.push(u);
     }
 
+    const plannedIdx = options.planned?.[direction];
+    if (plannedIdx) {
+      for (const p of plannedIdx.values()) {
+        if (!byRide.has(p.ritNummer) && isCountedRide(p, options.rideFilter)) listOnlyRides.push(p);
+      }
+    }
+
     const rideByNumber = new Map<string, Ride>();
     for (const [ritNummer, list] of byRide) {
-      const date = resolveRideDate(list.map((u) => directionalDate(u, direction)));
-      if (!date) {
+      const scans = resolveRideDate(list.map((u) => directionalDate(u, direction)));
+      const plan = plannedIdx?.get(ritNummer);
+      const usePlan = plan && isCountedRide(plan, options.rideFilter) ? plan : null;
+      if (!scans && !usePlan) {
         undatedRides.push({ direction, ritNummer, huCount: list.length });
         continue;
       }
+      const canonical = usePlan?.plannedDate ?? scans!.canonicalDate;
+      const date = {
+        canonicalDate: canonical,
+        period: periodOfDayKey(canonical),
+        resolution: usePlan ? ("planned" as const) : scans!.resolution,
+        outlierHuCount: scans ? scans.outlierHuCount : 0,
+      };
       const huByPrincipal: Partial<Record<Principal, number>> = {};
       for (const u of list) huByPrincipal[u.principal] = (huByPrincipal[u.principal] ?? 0) + 1;
       const ride: Ride = {
         direction,
         ritNummer,
         canonicalDate: date.canonicalDate,
+        scanDate: scans?.canonicalDate ?? date.canonicalDate,
+        plannedUnits: plan ? plan.units : null,
         period: date.period,
         dateResolution: date.resolution,
         outlierHuCount: date.outlierHuCount,
@@ -145,7 +173,7 @@ export function materializeRides(units: readonly WmsUnit[]): MaterializeResult {
     }
   }
 
-  return { rides, shipments, undatedRides };
+  return { rides, shipments, undatedRides, listOnlyRides };
 }
 
 /** Lookup of canonical ride info per direction, for KPI code. */

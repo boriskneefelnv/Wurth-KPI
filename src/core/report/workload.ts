@@ -57,9 +57,9 @@ const SERIES_KEYS: SeriesKey[] = [...PRINCIPALS, "Total"];
 
 /**
  * Inbound/outbound volume per bucket and principal.
- * HUs: by Inslag Unit / Uitslag Unit. Rides: each ride once, on its canonical
- * day (5% rule); a ride with several principals counts for each of them, but
- * once in the total.
+ * HUs: on the day of their ride (see ReportOptions.huDating). Rides: each ride
+ * once, on its date; a ride with several principals counts for each of them,
+ * but once in the total.
  */
 export function computeVolume(ctx: ReportContext, perspective: Perspective): VolumeBlock {
   const { buckets } = ctx;
@@ -80,8 +80,8 @@ export function computeVolume(ctx: ReportContext, perspective: Perspective): Vol
     };
     if (perspective === "hus") {
       for (const u of ctx.units) {
-        const d = directionalDate(u, direction);
-        if (d) add([u.principal, "Total"], dayKey(d));
+        const day = ctx.unitDay(u, direction);
+        if (day) add([u.principal, "Total"], day);
       }
     } else {
       for (const ride of selectedRides(ctx, direction)) add([...ride.principals, "Total"], ride.canonicalDate);
@@ -145,7 +145,7 @@ export function computeContainerMix(ctx: ReportContext, perspective: Perspective
 
   if (perspective === "hus") {
     for (const u of ctx.units) {
-      if (!ctx.inPeriod(u.uitslagUnit)) continue;
+      if (!ctx.unitInPeriod(u, "outbound")) continue;
       const t = u.shipmentType ?? "Onbekend";
       total[t]++;
       per[u.principal][t]++;
@@ -196,7 +196,7 @@ export function computeDestinations(ctx: ReportContext, perspective: Perspective
 
   if (perspective === "hus") {
     for (const u of ctx.units) {
-      if (!ctx.inPeriod(u.uitslagUnit)) continue;
+      if (!ctx.unitInPeriod(u, "outbound")) continue;
       const r = row(u.losLand ?? "Onbekend");
       r.total++;
       r.perPrincipal[u.principal]++;

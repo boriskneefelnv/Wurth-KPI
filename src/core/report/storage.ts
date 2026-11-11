@@ -25,7 +25,7 @@ function stats(units: readonly WmsUnit[]): StorageStats {
 /** HUs that left the warehouse in the period and have a storage duration. */
 export function storagePopulation(ctx: ReportContext): WmsUnit[] {
   return ctx.units.filter(
-    (u) => ctx.inPeriod(u.uitslagUnit) && u.dagenInOpslag !== null,
+    (u) => ctx.unitInPeriod(u, "outbound") && u.dagenInOpslag !== null,
   );
 }
 

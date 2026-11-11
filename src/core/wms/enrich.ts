@@ -93,7 +93,7 @@ export function classifyShipmentType(containertype: string, seals: readonly stri
 // Enrichment
 // ---------------------------------------------------------------------------
 
-export type RejectReason = "status" | "no-dates" | "negative-storage" | "invalid-weight";
+export type RejectReason = "status" | "no-dates" | "invalid-weight";
 
 export interface RejectedRow {
   rowIndex: number;
@@ -113,6 +113,8 @@ export interface EnrichValidation {
   excludedStatuses: Record<string, number>;
   /** Unknown clients (as written in the file) → row count. They are mapped to "Overig". */
   unknownPrincipals: Record<string, number>;
+  /** Accepted rows whose "Dagen in opslag" is negative; their storage days are left empty. */
+  negativeStorage: { rowIndex: number; days: number }[];
   /** Accepted rows with a date cell that could not be parsed, per column. */
   unparseableDates: Record<string, number>;
   /** Optional columns missing from the file; the KPIs listed cannot be measured. */
@@ -146,6 +148,7 @@ export function enrichWms(parsed: ParsedWms, options: EnrichOptions = {}): Enric
     rejected: [],
     excludedStatuses: {},
     unknownPrincipals: {},
+    negativeStorage: [],
     unparseableDates: {},
     missingOptional: [],
   };
@@ -207,13 +210,19 @@ function enrichRow(row: RawWmsRow, map: Readonly<Record<string, Principal>>, v: 
 
   if (!dates.inslagUnit && !dates.uitslagUnit) return reject("no-dates", "Inslag en uitslag leeg");
 
-  const dagenRaw = parseNumber(row["Dagen in opslag"]);
-  if (dagenRaw !== null && dagenRaw < 0) return reject("negative-storage", String(dagenRaw));
+  // A negative storage duration is a data error in that column, not a reason to
+  // drop the HU from volume: keep the row, leave storage days empty, report it.
+  let dagenRaw = parseNumber(row["Dagen in opslag"]);
+  const negativeStorage = dagenRaw !== null && dagenRaw < 0;
 
   const brutoKg = parseNumber(row["Bruto kg"]) ?? 0;
   if (brutoKg <= 0) return reject("invalid-weight", String(row["Bruto kg"] ?? ""));
 
   for (const col of badDates) v.unparseableDates[col] = (v.unparseableDates[col] ?? 0) + 1;
+  if (negativeStorage) {
+    v.negativeStorage.push({ rowIndex: row.__rowIndex, days: dagenRaw! });
+    dagenRaw = null;
+  }
 
   let principal = map[normalizeOpdrachtgever(opdrachtgever)];
   if (!principal) {

@@ -16,7 +16,7 @@ export function computeFlow(ctx: ReportContext): FlowBlock {
   const pop = ctx.units.filter(
     (u) =>
       u.status === "geladen" &&
-      ctx.inPeriod(u.uitslagUnit) &&
+      ctx.unitInPeriod(u, "outbound") &&
       u.shipmentType !== null &&
       u.shipmentType !== "Onbekend" &&
       u.losLand,
@@ -109,7 +109,7 @@ export function computeProfiles(ctx: ReportContext): Record<MainPrincipal, Princ
   const out = {} as Record<MainPrincipal, PrincipalProfile>;
   for (const principal of MAIN_PRINCIPALS) {
     const units = ctx.units.filter(
-      (u) => u.principal === principal && ctx.inPeriod(u.uitslagUnit),
+      (u) => u.principal === principal && ctx.unitInPeriod(u, "outbound"),
     );
     const typeCounts = Object.fromEntries(KNOWN_SHIPMENT_TYPES.map((t) => [t, 0])) as Record<KnownShipmentType, number>;
     let typed = 0;

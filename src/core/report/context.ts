@@ -1,6 +1,6 @@
 import { dayKey } from "../dates";
 import { bucketsFor, inRange, workdaysInRange, type ReportPeriod, type TrendBucket } from "../period";
-import { indexRides, materializeRides, rideOf, type RideIndex } from "../wms/rides";
+import { directionalDate, indexRides, materializeRides, rideOf, type RideIndex } from "../wms/rides";
 import type { DayKey, Direction, Principal, Ride, WmsUnit } from "../types";
 
 export interface ReportOptions {
@@ -11,6 +11,13 @@ export interface ReportOptions {
    * scan vs planned departure. `latest`: every HU must be out by the planned day.
    */
   onTimeRule?: "earliest" | "latest";
+  /**
+   * Which day an HU counts on. `ride` (default): the day of its ride (Verwachte
+   * datum from the ride list, else the 5% rule), so HUs and rides always fall
+   * in the same period; HUs without a ride use their own scan. `scan`: the
+   * HU's own Inslag Unit / Uitslag Unit.
+   */
+  huDating?: "ride" | "scan";
 }
 
 /** Everything the KPI functions need for one period, computed once. */
@@ -25,6 +32,10 @@ export interface ReportContext {
   options: Required<Omit<ReportOptions, "holidays">>;
   /** True when the (wall-clock) date falls inside the report period. */
   inPeriod(d: Date | null): boolean;
+  /** Day an HU counts on for a direction (see ReportOptions.huDating); null when it has no movement. */
+  unitDay(u: WmsUnit, direction: Direction): DayKey | null;
+  /** True when the HU's inbound/outbound movement counts in the report period. */
+  unitInPeriod(u: WmsUnit, direction: Direction): boolean;
 }
 
 export function buildContext(
@@ -44,16 +55,33 @@ export function buildContext(
     }
   }
   const holidays = new Set(options.holidays ?? []);
+  const rideIndex = indexRides(rides ?? materializeRides(units).rides);
+  const huDating = options.huDating ?? "ride";
+  const unitDay = (u: WmsUnit, direction: Direction): DayKey | null => {
+    const scan = directionalDate(u, direction);
+    if (!scan) return null;
+    if (huDating === "ride") {
+      const rit = rideOf(u, direction);
+      const ride = rit ? rideIndex[direction].get(rit) : undefined;
+      if (ride) return ride.canonicalDate;
+    }
+    return dayKey(scan);
+  };
   return {
     units,
     period,
     buckets: bucketsFor(period),
     workdays: workdaysInRange(period, holidays),
-    rides: indexRides(rides ?? materializeRides(units).rides),
+    rides: rideIndex,
     unitsByRide,
     holidays,
-    options: { onTimeRule: options.onTimeRule ?? "earliest" },
+    options: { onTimeRule: options.onTimeRule ?? "earliest", huDating },
     inPeriod: (d) => d !== null && inRange(dayKey(d), period),
+    unitDay,
+    unitInPeriod: (u, direction) => {
+      const k = unitDay(u, direction);
+      return k !== null && inRange(k, period);
+    },
   };
 }
 

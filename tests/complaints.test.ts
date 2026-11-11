@@ -19,6 +19,8 @@ const complaint = (c: Partial<Complaint> & { klachtnr: number }): Complaint => (
 
 const ride = (r: Partial<Ride> & Pick<Ride, "direction" | "ritNummer">): Ride => ({
   canonicalDate: "2026-04-02",
+  scanDate: "2026-04-02",
+  plannedUnits: null,
   period: "2026-04",
   dateResolution: "single",
   outlierHuCount: 0,

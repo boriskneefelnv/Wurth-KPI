@@ -67,7 +67,8 @@ export interface WmsUnit {
   outboundPeriod: Period | null;
 }
 
-export type DateResolution = "single" | "majority_5pct";
+/** How a ride got its date: from the ride list (planned) or from the HU scans (5% rule). */
+export type DateResolution = "planned" | "single" | "majority_5pct";
 
 export interface RideDate {
   canonicalDate: DayKey;
@@ -82,7 +83,12 @@ export interface RideDate {
 export interface Ride {
   direction: Direction;
   ritNummer: string;
+  /** Leading date: Verwachte datum from the ride list, else the 5% rule on scans. */
   canonicalDate: DayKey;
+  /** Date from the HU scans (5% rule), kept for comparison with the planned date. */
+  scanDate: DayKey;
+  /** Units according to the ride list (null when the ride is not on a list). */
+  plannedUnits: number | null;
   period: Period;
   dateResolution: DateResolution;
   outlierHuCount: number;

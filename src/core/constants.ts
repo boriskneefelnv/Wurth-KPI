@@ -50,11 +50,15 @@ export const EXCLUDED_STATUS_PREFIXES = ["manual adjus"] as const;
 /**
  * Opdrachtgever (normalised: trimmed, lowercased, single spaces) → principal.
  *
- * TODO(verify): fill with the exact client names from a real WMS export.
+ * Checked against the H1 2026 export: Liqui Moly GmbH, Adolf Würth GmbH & Co. KG,
+ * Würth Logistics AG. TODO(confirm): Würth Logistics AG = WIAG.
  * Unknown clients map to "Overig" and are listed in validation.
  */
 export const DEFAULT_OPDRACHTGEVER_MAP: Readonly<Record<string, Principal>> = {
   wiag: "WIAG",
+  // Seen in the H1 2026 export as one of three clients; assumed WIAG (to confirm).
+  "würth logistics ag": "WIAG",
+  "wurth logistics ag": "WIAG",
   "würth international ag": "WIAG",
   "wurth international ag": "WIAG",
   awkg: "AWKG",
