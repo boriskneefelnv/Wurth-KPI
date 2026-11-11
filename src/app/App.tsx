@@ -274,7 +274,7 @@ export function App() {
     <div className="app">
       <header className="top">
         <div className="brand">Würth KPI-tool</div>
-        <div className="by">Neele-Vat Maasvlakte</div>
+        <img className="by" src={`${import.meta.env.BASE_URL}brand/neelevat-maasvlakte-blue.png`} alt="Neele-Vat Maasvlakte" />
       </header>
 
       <section className="panel">

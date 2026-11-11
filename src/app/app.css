@@ -25,7 +25,7 @@ body {
 }
 .top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   padding: 22px 0 18px;
   border-bottom: 3px solid var(--blue);
@@ -37,11 +37,9 @@ body {
   color: var(--dblue);
 }
 .top .by {
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--lgrey);
+  height: 20px;
+  width: auto;
+  display: block;
 }
 .panel {
   background: #fff;
