@@ -10,7 +10,7 @@ import {
 import { comparisonOptionsWithQuality, LAADDATUM_LEAD_MONTHS, periodQuality, rideIssues, unitExportAdvice } from "../core/report/quality";
 import { reconcileRideLists } from "../core/report/reconcile";
 import { computeReportSet } from "../core/report/report";
-import { LEAD_MONTHS, lastScanDay, TRAIL_MONTHS } from "../core/wms/exportRange";
+import { lastScanDay } from "../core/wms/exportRange";
 import { exportRequirements, missingSpans, type DateSpan, type DisplayRange } from "../core/wms/requirements";
 import { coverageFromRideLists, indexPlannedRides } from "../core/wms/rideLists";
 import { materializeRides } from "../core/wms/rides";
@@ -210,7 +210,6 @@ export function App() {
       { kind: "units" as const, label: "Unitoverzicht", field: "Laaddatum", required: req.units, ...status("units", req.units) },
     ];
   }, [dataset, req]);
-  const allComplete = sources.every((s) => s.loaded && s.missing.length === 0);
 
   // Months that do not match, and whether the unit export simply starts too late for them.
   const advice = useMemo(() => {
@@ -303,7 +302,7 @@ export function App() {
           </fieldset>
         </div>
 
-        <div className={`advice ${allComplete ? "ok" : ""}`}>
+        <div className="exports">
           <div className="eyebrow">Draai deze exports uit de WMS</div>
           <table className="grid sources">
             <thead>
@@ -342,12 +341,7 @@ export function App() {
               ))}
             </tbody>
           </table>
-          <p className="muted">
-            Ritten: de maanden die je laat zien{range.previous || range.lastYear ? " plus de vergelijkingsperiode" : ""}. Unitoverzicht: de
-            laaddatum is de ophaaldatum bij de leverancier en ligt meestal weken vóór de rit, soms kort erna; daarom {LEAD_MONTHS} maanden
-            ervoor en {TRAIL_MONTHS} maand erna (99,97% van de pallets, gemeten over 2025 en 2026). Geeft de WMS precies 50.000 rijen, dan
-            meldt de tool welk stuk je nog moet draaien; sleep alle delen in, overlap telt niet dubbel.
-          </p>
+
         </div>
 
         <label
@@ -361,7 +355,6 @@ export function App() {
           <input type="file" accept=".xlsx" multiple onChange={(e) => e.target.files && void load(e.target.files)} />
           <span>Bestanden kiezen of hierheen slepen</span>
         </label>
-        <p className="muted note">De tool herkent zelf welk bestand wat is. Alles blijft op deze computer.</p>
         {busy && <p className="busy">{busy}</p>}
         {error && <p className="error">{error}</p>}
         {dataset && dataset.files.length > 0 && <FileTable files={dataset.files} onRemove={removeFile} onClear={clearFiles} />}
