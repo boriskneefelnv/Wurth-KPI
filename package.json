@@ -1,0 +1,21 @@
+{
+  "name": "wurth-kpi",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Würth KPI- en QBR-tool van Neele-Vat",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check": "tsc --noEmit && vitest run"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
