@@ -273,8 +273,8 @@ export function App() {
   return (
     <div className="app">
       <header className="top">
-        <div className="brand">Würth KPI-tool</div>
-        <img className="by" src={`${import.meta.env.BASE_URL}brand/neelevat-maasvlakte-blue.png`} alt="Neele-Vat Maasvlakte" />
+        <img className="brand-logo" src={`${import.meta.env.BASE_URL}brand/neelevat-maasvlakte-blue.png`} alt="Neele-Vat Maasvlakte" />
+        <img className="client-logo" src={`${import.meta.env.BASE_URL}brand/wurth-logo-header.png`} alt="Würth" />
       </header>
 
       <section className="panel">

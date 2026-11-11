@@ -28,8 +28,18 @@ export interface PunctualitySlideModel {
   secondary: { label: string; pct: number | null } | null;
   /** Change in percentage points against each comparison period. */
   comparisons: { kind: ComparisonKind; label: string; pct: number | null; deltaPts: number | null }[];
-  perPrincipal: { principal: MainPrincipal; pct: number | null; ok: number; measured: number }[];
-  buckets: { key: string; label: string; pct: number | null; measured: number; ghostPct: number | null }[];
+  /** Change in points against the main comparison (last year when available). */
+  deltaPts: number | null;
+  deltaLabel: string | null;
+  perPrincipal: { principal: MainPrincipal; pct: number | null; ok: number; measured: number; deltaPts: number | null }[];
+  buckets: {
+    key: string;
+    label: string;
+    pct: number | null;
+    measured: number;
+    ghostPct: number | null;
+    perPrincipal: Record<MainPrincipal, number | null>;
+  }[];
   ghost: { kind: ComparisonKind; label: string } | null;
   late: { total: number; oneWorkday: number };
   headline: string;
@@ -76,6 +86,7 @@ export function punctualitySlide(set: ReportSet, kind: PunctualityKind): Punctua
   }
   const context: string[] = [];
   const primary = comparisons.find((c) => c.kind === "lastYear" && c.deltaPts !== null) ?? comparisons.find((c) => c.deltaPts !== null);
+  const primaryReport = primary ? set.comparisons.find((c) => c.kind === primary.kind)?.report ?? null : null;
   if (primary && primary.deltaPts !== null) {
     const w = pointsWords(primary.deltaPts);
     context.push(`${w.charAt(0).toUpperCase()}${w.slice(1)} on ${primary.label.replace(/^vs /, "")}.`);
@@ -100,9 +111,12 @@ export function punctualitySlide(set: ReportSet, kind: PunctualityKind): Punctua
     measured,
     secondary: kind === "stocking" ? { label: "Within one workday", pct: cur.withinOneWorkday.pct } : null,
     comparisons,
+    deltaPts: primary?.deltaPts ?? null,
+    deltaLabel: primary?.label ?? null,
     perPrincipal: MAIN_PRINCIPALS.map((p) => {
       const c = cur.perPrincipal[p];
-      return { principal: p, pct: c.pct, ok: c.ok, measured: c.ok + c.notOk };
+      const prev = primaryReport ? pick(primaryReport, kind).perPrincipal[p].pct : null;
+      return { principal: p, pct: c.pct, ok: c.ok, measured: c.ok + c.notOk, deltaPts: c.pct !== null && prev !== null ? c.pct - prev : null };
     }),
     buckets: cur.perBucket.map((b, i) => ({
       key: b.key,
@@ -110,6 +124,7 @@ export function punctualitySlide(set: ReportSet, kind: PunctualityKind): Punctua
       pct: b.pct,
       measured: b.ok + b.notOk,
       ghostPct: ghostRes?.perBucket[i]?.pct ?? null,
+      perPrincipal: Object.fromEntries(MAIN_PRINCIPALS.map((p) => [p, cur.perBucketPerPrincipal[p][i]?.pct ?? null])) as Record<MainPrincipal, number | null>,
     })),
     ghost: ghostCmp && ghostRes ? { kind: ghostCmp.kind, label: ghostCmp.report.period.label } : null,
     late,

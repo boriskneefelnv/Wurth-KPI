@@ -31,13 +31,13 @@ body {
   border-bottom: 3px solid var(--blue);
   margin-bottom: 24px;
 }
-.top .brand {
-  font-size: 18px;
-  font-weight: bold;
-  color: var(--dblue);
-}
-.top .by {
+.top .brand-logo {
   height: 20px;
+  width: auto;
+  display: block;
+}
+.top .client-logo {
+  height: 18px;
   width: auto;
   display: block;
 }

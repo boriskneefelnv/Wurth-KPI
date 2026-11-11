@@ -20,6 +20,8 @@ export interface PunctualityResult extends PunctualityCounts {
   perPrincipal: Record<MainPrincipal, PunctualityCounts>;
   /** Per bucket of the period (day, week or month), by the ride's planned day. */
   perBucket: ({ key: string; label: string } & PunctualityCounts)[];
+  /** Per main principal, per bucket (same order as perBucket). */
+  perBucketPerPrincipal: Record<MainPrincipal, PunctualityCounts[]>;
   /** Late rides by number of workdays late (1, 2, …). */
   lateByWorkdays: Record<number, number>;
   /** Rides that were late by at most one workday (for "within 1 workday"). */
@@ -49,6 +51,7 @@ function aggregate(
   const within = zero();
   const perPrincipal = Object.fromEntries(MAIN_PRINCIPALS.map((p) => [p, zero()])) as Record<MainPrincipal, PunctualityCounts>;
   const perBucket = ctx.buckets.map(zero);
+  const perBucketPerPrincipal = Object.fromEntries(MAIN_PRINCIPALS.map((p) => [p, ctx.buckets.map(zero)])) as Record<MainPrincipal, PunctualityCounts[]>;
   const lateByWorkdays: Record<number, number> = {};
   const exceptions: PunctualityResult["exceptions"] = [];
   let notMeasurable = 0;
@@ -63,7 +66,10 @@ function aggregate(
     const buckets = [total];
     const bi = bucketIndex(ctx.buckets, ride.canonicalDate);
     if (bi !== -1) buckets.push(perBucket[bi]!);
-    if ((MAIN_PRINCIPALS as readonly string[]).includes(principal)) buckets.push(perPrincipal[principal as MainPrincipal]);
+    if ((MAIN_PRINCIPALS as readonly string[]).includes(principal)) {
+      buckets.push(perPrincipal[principal as MainPrincipal]);
+      if (bi !== -1) buckets.push(perBucketPerPrincipal[principal as MainPrincipal][bi]!);
+    }
     for (const b of buckets) outcome.ok ? b.ok++ : b.notOk++;
     const late = workdaysLate(outcome.planned, outcome.actual, ctx.holidays);
     late <= 1 ? within.ok++ : within.notOk++;
@@ -80,6 +86,7 @@ function aggregate(
   finish(within);
   Object.values(perPrincipal).forEach(finish);
   perBucket.forEach(finish);
+  Object.values(perBucketPerPrincipal).forEach((xs) => xs.forEach(finish));
 
   return {
     ...total,
@@ -88,6 +95,7 @@ function aggregate(
     notMeasurable,
     perPrincipal,
     perBucket: perBucket.map((c, i) => ({ key: ctx.buckets[i]!.key, label: ctx.buckets[i]!.label, ...c })),
+    perBucketPerPrincipal,
     lateByWorkdays,
     withinOneWorkday: within,
     exceptions: exceptions.sort((a, b) => a.actual.localeCompare(b.actual)),

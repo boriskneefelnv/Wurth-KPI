@@ -1,160 +1,185 @@
 import { fmtDec } from "../../core/slides/format";
 import type { PunctualitySlideModel } from "../../core/slides/punctuality";
+import type { MainPrincipal } from "../../core/types";
 import { ANIM, entry, useAnimate, useTweenNumber } from "../anim";
 import { SlideShell } from "../SlideShell";
 import { T } from "../tokens";
 
-const BAD = "#D4884A"; // below target (as in the original slide)
+/** Principal blues of the original on time slide. */
+const PRINCIPAL_BLUE: Record<MainPrincipal, string> = { WIAG: "#1E5478", AWKG: "#2A7AB0", "Liqui Moly": "#4FA0D4" };
 const TARGET = "#7DB73E";
+const BELOW = "#B5652B";
 
 /**
- * On time slide (loading or stocking): one large percentage against the
- * target with the principals as small figures, and one chart per period with
- * the target line. Calm by design: one message, one chart.
+ * On time slide (loading or stocking), after the original Würth layout but
+ * tighter: one row with all principals together and each principal, then the
+ * monthly chart per principal with the target line.
  */
 export function PunctualitySlide({ model, page, total }: { model: PunctualitySlideModel; page: number; total: number }) {
   const subtitle = [model.headline, model.context].filter(Boolean).join(" ");
   return (
     <SlideShell title={model.title} subtitle={subtitle} page={page} total={total}>
-      <Hero model={model} />
+      <div style={{ display: "grid", gridTemplateColumns: "1.25fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <Card
+          index={0}
+          accent={T.heroText}
+          label="All principals"
+          pct={model.pct}
+          sub={`${model.ok.toLocaleString("nl-NL")} / ${model.measured.toLocaleString("nl-NL")} rides`}
+          deltaPts={model.deltaPts}
+          deltaLabel={model.deltaLabel}
+          below={model.meetsTarget === false}
+          extra={
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+              <span style={{ fontSize: 11, color: T.textSecondary }}>Target {model.target}%</span>
+              {model.meetsTarget !== null && (
+                <span
+                  style={{
+                    padding: "3px 9px",
+                    borderRadius: 10,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: model.meetsTarget ? "#E8F4E1" : "#FBEFE4",
+                    color: model.meetsTarget ? "#3D7F1F" : BELOW,
+                  }}
+                >
+                  {model.meetsTarget ? "Achieved" : "Below target"}
+                </span>
+              )}
+              {model.secondary && model.secondary.pct !== null && (
+                <span style={{ fontSize: 11, color: T.textSecondary, whiteSpace: "nowrap" }}>
+                  {model.secondary.label}: <strong style={{ color: T.heroText }}>{fmtDec(model.secondary.pct)}%</strong>
+                </span>
+              )}
+            </div>
+          }
+        />
+        {model.perPrincipal.map((p, i) => (
+          <Card
+            key={p.principal}
+            index={i + 1}
+            accent={PRINCIPAL_BLUE[p.principal]}
+            label={p.principal}
+            pct={p.pct}
+            sub={`${p.ok.toLocaleString("nl-NL")} / ${p.measured.toLocaleString("nl-NL")} rides`}
+            deltaPts={p.deltaPts}
+            deltaLabel={model.deltaLabel}
+            below={p.pct !== null && p.pct < model.target}
+          />
+        ))}
+      </div>
       <Chart model={model} />
     </SlideShell>
   );
 }
 
-const pctText = (x: number | null) => (x === null ? "n/a" : `${fmtDec(x)}%`);
-
-function Hero({ model }: { model: PunctualitySlideModel }) {
+function Card({
+  index,
+  accent,
+  label,
+  pct,
+  sub,
+  deltaPts,
+  deltaLabel,
+  below,
+  extra,
+}: {
+  index: number;
+  accent: string;
+  label: string;
+  pct: number | null;
+  sub: string;
+  deltaPts: number | null;
+  deltaLabel: string | null;
+  below: boolean;
+  extra?: React.ReactNode;
+}) {
   const animate = useAnimate();
-  const n = useTweenNumber(model.pct ?? 0, ANIM.count);
-  const ok = model.meetsTarget;
+  const delay = index * ANIM.cardStagger;
+  const n = useTweenNumber(pct ?? 0, ANIM.count, delay);
   return (
     <div
       style={{
         background: T.card,
         borderRadius: 6,
         boxShadow: T.cardShadow,
-        padding: "20px 28px",
-        display: "grid",
-        gridTemplateColumns: "1.25fr 1fr 0.8fr 1.6fr",
-        alignItems: "center",
-        gap: 28,
-        marginBottom: 16,
-        ...entry(animate, "deckRiseIn", ANIM.cardIn, 0),
+        borderTop: `3px solid ${accent}`,
+        padding: "12px 16px 12px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        ...entry(animate, "deckRiseIn", ANIM.cardIn, delay),
       }}
     >
       <div>
-        <div style={{ width: 28, height: 2, background: T.inbound, marginBottom: 10 }} />
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: T.inbound, textTransform: "uppercase" }}>{model.label}</div>
-        <div style={{ fontSize: 60, fontWeight: 700, color: T.heroText, lineHeight: 1, marginTop: 10, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
-          {model.pct === null ? "n/a" : `${fmtDec(n)}%`}
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: T.inbound, textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</div>
+        <div style={{ fontSize: 30, fontWeight: 700, color: below ? BELOW : T.heroText, lineHeight: 1.05, marginTop: 6, fontVariantNumeric: "tabular-nums" }}>
+          {pct === null ? "n/a" : `${fmtDec(n)}%`}
         </div>
-        <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 8 }}>
-          {model.ok.toLocaleString("nl-NL")} of {model.measured.toLocaleString("nl-NL")} rides
-          {model.secondary && model.secondary.pct !== null && (
-            <>
-              {" · "}
-              {model.secondary.label.toLowerCase()} <strong style={{ color: T.heroText }}>{pctText(model.secondary.pct)}</strong>
-            </>
-          )}
+        <div style={{ fontSize: 11, color: T.textSecondary, marginTop: 4 }}>{sub}</div>
+        <div style={{ marginTop: 7, minHeight: 19, ...entry(animate, "deckFadeIn", ANIM.badgeIn, ANIM.badgeDelay + delay) }}>
+          {deltaPts !== null && deltaLabel && <Delta pts={deltaPts} label={deltaLabel} />}
         </div>
       </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, ...entry(animate, "deckFadeIn", ANIM.badgeIn, ANIM.badgeDelay) }}>
-        {model.comparisons.map((c) => (
-          <div key={c.kind} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: T.textSecondary }}>
-            <Delta pts={c.deltaPts} />
-            <span>{c.label}</span>
-            <span style={{ color: T.textSecondary, opacity: 0.8 }}>({pctText(c.pct)})</span>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, ...entry(animate, "deckFadeIn", ANIM.badgeIn, ANIM.badgeDelay + 100) }}>
-        <div style={{ fontSize: 12, color: T.textSecondary }}>Target {model.target}%</div>
-        {ok !== null && (
-          <span
-            style={{
-              padding: "4px 10px",
-              borderRadius: 10,
-              fontSize: 12,
-              fontWeight: 600,
-              background: ok ? "#E8F4E1" : "#FBEFE4",
-              color: ok ? "#3D7F1F" : "#B5652B",
-            }}
-          >
-            {ok ? "Achieved" : "Below target"}
-          </span>
-        )}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-        {model.perPrincipal.map((p, i) => (
-          <div key={p.principal} style={{ borderLeft: `1px solid ${T.borderSubtle}`, paddingLeft: 14, ...entry(animate, "deckRiseIn", ANIM.cardIn, 200 + i * ANIM.cardStagger) }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: T.inbound, textTransform: "uppercase", whiteSpace: "nowrap" }}>{p.principal}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: T.heroText, marginTop: 6, fontVariantNumeric: "tabular-nums" }}>{pctText(p.pct)}</div>
-            <div style={{ fontSize: 11, color: T.textSecondary, marginTop: 2 }}>
-              {p.ok.toLocaleString("nl-NL")} / {p.measured.toLocaleString("nl-NL")}
-            </div>
-          </div>
-        ))}
-      </div>
+      {extra}
     </div>
   );
 }
 
-function Delta({ pts }: { pts: number | null }) {
-  if (pts === null) return <span style={{ minWidth: 70 }}>n/a</span>;
+function Delta({ pts, label }: { pts: number; label: string }) {
   const stable = Math.abs(pts) < 0.05;
   const up = pts > 0;
-  const style = stable ? { background: "#E9EFF5", color: "#475569" } : up ? { background: "#E8F4E1", color: "#3D7F1F" } : { background: "#FBEFE4", color: "#B5652B" };
+  const style = stable ? { background: "#E9EFF5", color: "#475569" } : up ? { background: "#E8F4E1", color: "#3D7F1F" } : { background: "#FBEFE4", color: BELOW };
   return (
-    <span style={{ padding: "3px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700, minWidth: 70, textAlign: "center", ...style }}>
-      {stable ? "0,0" : `${up ? "+" : "-"}${fmtDec(Math.abs(pts))}`} pts
+    <span style={{ display: "inline-flex", gap: 5, padding: "2px 8px", borderRadius: 10, fontSize: 10.5, whiteSpace: "nowrap", ...style }}>
+      <strong>{stable ? "0,0" : `${up ? "+" : "-"}${fmtDec(Math.abs(pts))}`} pts</strong>
+      <span style={{ opacity: 0.85 }}>{label}</span>
     </span>
   );
 }
 
+const PRINCIPALS: MainPrincipal[] = ["WIAG", "AWKG", "Liqui Moly"];
+
+/** Bar label: one decimal, but a clean "100%" so neighbouring labels never touch. */
+const barValue = (v: number) => (v >= 99.95 ? "100%" : `${fmtDec(v)}%`);
+
 function Chart({ model }: { model: PunctualitySlideModel }) {
   const animate = useAnimate();
-  const values = model.buckets.flatMap((b) => [b.pct, b.ghostPct]).filter((v): v is number => v !== null);
+  const values = model.buckets.flatMap((b) => PRINCIPALS.map((p) => b.perPrincipal[p])).filter((v): v is number => v !== null);
   const low = Math.min(model.target, ...values);
   const yMax = 100;
-  // Axis from 100% down in steps of 5 (or 10 for a wide range), always ending at a tick.
   const step = low - 5 >= 70 ? 5 : 10;
-  const yMin = Math.max(0, yMax - Math.ceil((yMax - (low - 5)) / step) * step);
+  const yMin = Math.max(50, yMax - Math.ceil((yMax - (low - 5)) / step) * step);
   const ticks: number[] = [];
   for (let t = yMax; t >= yMin; t -= step) ticks.push(t);
-  const PLOT_H = 232;
-  const Y_W = 46;
+  const PLOT_H = 274;
+  const Y_W = 44;
   const n = model.buckets.length;
-  const barW = n <= 4 ? 64 : n <= 7 ? 48 : n <= 10 ? 32 : 26;
+  const barW = n <= 3 ? 44 : n <= 6 ? 32 : n <= 9 ? 20 : 13;
+  const gap = n <= 6 ? 6 : 3;
+  const showValues = n <= 6;
   const y = (v: number) => PLOT_H - ((Math.max(yMin, Math.min(yMax, v)) - yMin) / (yMax - yMin)) * PLOT_H;
   const per = model.period.kind === "week" ? "Per day" : model.period.kind === "month" ? "Per week" : "Per month";
 
   return (
-    <div style={{ flex: 1, minHeight: 0, background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "18px 24px 14px", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: T.textSecondary }}>{per} · share of rides on time</div>
-        <div style={{ display: "flex", gap: 18, fontSize: 11, fontWeight: 500, color: T.heroText }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 2, background: T.inbound }} />
-            On or above target
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 2, background: BAD }} />
-            Below target
-          </span>
-          {model.ghost && (
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 14, height: 2, background: T.heroText }} />
-              {model.ghost.label}
+    <div style={{ flex: 1, minHeight: 0, background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "14px 22px 10px", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 24 }}>
+        <div style={{ fontSize: 12, color: T.textSecondary }}>{per} · per principal</div>
+        <div style={{ display: "flex", gap: 16, fontSize: 11, fontWeight: 500, color: T.heroText }}>
+          {PRINCIPALS.map((p) => (
+            <span key={p} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ width: 11, height: 11, borderRadius: 2, background: PRINCIPAL_BLUE[p] }} />
+              {p}
             </span>
-          )}
+          ))}
+          <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <span style={{ width: 16, borderTop: `2px dashed ${TARGET}` }} />
+            Target {model.target}%
+          </span>
         </div>
       </div>
 
-      <div style={{ display: "flex", position: "relative" }}>
+      <div style={{ display: "flex" }}>
         <div style={{ width: Y_W, position: "relative", height: PLOT_H }}>
           {ticks.map((t) => (
             <div key={t} style={{ position: "absolute", right: 10, top: y(t) - 6, fontSize: 10, color: T.axis }}>
@@ -165,87 +190,71 @@ function Chart({ model }: { model: PunctualitySlideModel }) {
         <div style={{ flex: 1, position: "relative" }}>
           <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: PLOT_H }}>
             {ticks.map((t) => (
-              <div key={t} style={{ position: "absolute", left: 0, right: 0, top: y(t), borderTop: `1px dashed ${T.gridline}`, opacity: t === yMin ? 1 : 0.6 }} />
+              <div key={t} style={{ position: "absolute", left: 0, right: 0, top: y(t), borderTop: `1px dashed ${T.gridline}`, opacity: t === yMin ? 1 : 0.55 }} />
             ))}
             <div style={{ position: "absolute", left: 0, right: 0, top: y(model.target), borderTop: `2px dashed ${TARGET}`, ...entry(animate, "deckFadeIn", 300, 200) }} />
-            <div
-              style={{
-                position: "absolute",
-                right: 0,
-                top: y(model.target) - 18,
-                fontSize: 11,
-                fontWeight: 600,
-                color: TARGET,
-                background: T.card,
-                paddingLeft: 6,
-                ...entry(animate, "deckFadeIn", 300, 200),
-              }}
-            >
-              Target {model.target}%
-            </div>
           </div>
-          <div style={{ position: "relative", height: PLOT_H, display: "flex", justifyContent: "space-around", alignItems: "flex-end", padding: "0 60px 0 12px" }}>
-            {model.buckets.map((b, i) => {
-              const delay = i * ANIM.barStagger;
-              const below = b.pct !== null && b.pct < model.target;
-              const h = b.pct === null ? 0 : PLOT_H - y(b.pct);
-              return (
-                <div key={b.key} title={b.pct === null ? "" : `${b.label}: ${fmtDec(b.pct)}% (${b.measured} rides)`} style={{ position: "relative", width: barW, height: PLOT_H }}>
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      width: barW,
-                      height: Math.max(b.pct === null ? 0 : 2, h),
-                      background: below ? BAD : T.inbound,
-                      borderTopLeftRadius: 2,
-                      borderTopRightRadius: 2,
-                      transformOrigin: "bottom",
-                      ...(animate ? { transform: "scaleY(0)", animation: `deckBarGrow ${ANIM.barGrow}ms ${delay}ms ease-out forwards` } : {}),
-                    }}
-                  />
-                  {b.ghostPct !== null && (
-                    <div
-                      title={`${model.ghost?.label}: ${fmtDec(b.ghostPct)}%`}
-                      style={{
-                        position: "absolute",
-                        left: -4,
-                        width: barW + 8,
-                        top: y(b.ghostPct) - 1,
-                        height: 2,
-                        background: T.heroText,
-                        opacity: 0.75,
-                        ...entry(animate, "deckFadeIn", 250, delay + ANIM.markerDelay),
-                      }}
-                    />
-                  )}
-                  {b.pct !== null && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: Math.max(h, b.ghostPct !== null ? PLOT_H - y(b.ghostPct) : 0) + 6,
-                        left: barW / 2 - 32,
-                        width: 64,
-                        textAlign: "center",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: below ? "#B5652B" : T.heroText,
-                        fontVariantNumeric: "tabular-nums",
-                        ...entry(animate, "deckFadeIn", ANIM.labelIn, delay + ANIM.barGrow),
-                      }}
-                    >
-                      {fmtDec(b.pct)}%
+          <div style={{ position: "relative", height: PLOT_H, display: "flex", justifyContent: "space-around", alignItems: "flex-end", padding: "0 8px" }}>
+            {model.buckets.map((b, gi) => (
+              <div key={b.key} style={{ display: "flex", alignItems: "flex-end", gap, height: PLOT_H }}>
+                {PRINCIPALS.map((p, bi) => {
+                  const v = b.perPrincipal[p];
+                  const delay = (gi * 3 + bi) * 40;
+                  const h = v === null ? 0 : Math.max(2, PLOT_H - y(v));
+                  const below = v !== null && v < model.target;
+                  return (
+                    <div key={p} title={v === null ? `${p}: no rides` : `${p} ${b.label}: ${fmtDec(v)}%`} style={{ position: "relative", width: barW, height: PLOT_H }}>
+                      {v !== null && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: 0,
+                            left: 0,
+                            width: barW,
+                            height: h,
+                            background: PRINCIPAL_BLUE[p],
+                            borderTopLeftRadius: 2,
+                            borderTopRightRadius: 2,
+                            transformOrigin: "bottom",
+                            ...(animate ? { transform: "scaleY(0)", animation: `deckBarGrow ${ANIM.barGrow}ms ${delay}ms ease-out forwards` } : {}),
+                          }}
+                        />
+                      )}
+                      {showValues && v !== null && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: h + 3,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            padding: "0 2px",
+                            background: T.card,
+                            borderRadius: 2,
+                            whiteSpace: "nowrap",
+                            lineHeight: "14px",
+                            fontSize: 10,
+                            fontWeight: 600,
+                            color: below ? BELOW : T.heroText,
+                            fontVariantNumeric: "tabular-nums",
+                            ...entry(animate, "deckFadeIn", ANIM.labelIn, delay + ANIM.barGrow),
+                          }}
+                        >
+                          {barValue(v)}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            ))}
           </div>
-          <div style={{ display: "flex", justifyContent: "space-around", padding: "0 60px 0 12px", marginTop: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-around", padding: "0 8px", marginTop: 8 }}>
             {model.buckets.map((b) => (
-              <div key={b.key} style={{ width: barW, textAlign: "center", fontSize: 12, fontWeight: 500, color: T.heroText, whiteSpace: "nowrap" }}>
-                {b.label}
+              <div key={b.key} style={{ width: barW * 3 + gap * 2, textAlign: "center", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: T.heroText }}>{b.label}</div>
+                <div style={{ fontSize: 10.5, color: b.pct !== null && b.pct < model.target ? BELOW : T.textSecondary, marginTop: 2 }}>
+                  {b.pct === null ? "" : `Total ${fmtDec(b.pct)}%`}
+                </div>
               </div>
             ))}
           </div>
