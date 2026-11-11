@@ -124,6 +124,14 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B66 | Deck nu: cover, sectie 01 Workload, vier volumeslides, afsluiting. Volgende slides worden één voor één toegevoegd. |
 | B67 | Beeldmateriaal (headerstrook, logo's, coverfoto) komt uit de oude repo, die al openbaar is, en staat nu in `public/brand/` zodat localdeploy het meeneemt. |
 
+## Exportbereik unitoverzicht (analyse H1-bestanden, 11 nov)
+
+| # | Besluit |
+|---|---|
+| B68 | Het unitoverzicht is gefilterd op Laaddatum (ophaaldatum bij de leverancier). In 2026 lag die gemiddeld 16 dagen vóór de uitgaande rit; 99% binnen 64 dagen, 99,9% binnen 113 dagen, maximaal 177 dagen (inkomend: 99,9% binnen 49 dagen). Het H1-overzicht vanaf laaddatum 5 jan 2026 miste daardoor 1.115 uitgaande pallets (968 voor januari, 141 voor februari) en 41 inkomende. Advies: exporteer vanaf laaddatum **vier maanden** vóór de eerste rapportmaand (vervangt de twee maanden uit B53). |
+| B69 | De app herkent een te laat beginnend unitoverzicht en geeft de laaddatum waarvanaf geëxporteerd moet worden. |
+| B70 | Ritten die net buiten de periode van de rittenlijst vallen (gescand binnen een week van de eerste of laatste lijstdatum, bv. gepland 1 juli en gescand 30 juni) krijgen in de controlelijst een eigen, onschuldige categorie. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

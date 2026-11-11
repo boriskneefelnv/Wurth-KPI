@@ -9,8 +9,9 @@ en zendingen, berekent de operationele en klacht-KPI's en maakt de QBR-presentat
 De tool is een website die volledig in de browser draait: geen server, geen database. Alle bestanden
 blijven op de eigen computer.
 
-1. Exporteer uit de WMS: **Unitoverzicht** (per half jaar, onder 50.000 rijen; laaddatum vanaf twee
-   maanden vóór de eerste rapportmaand), **Te laden ritten** en **Te lossen ritten**.
+1. Exporteer uit de WMS: **Unitoverzicht** met laaddatum vanaf **vier maanden vóór** de eerste
+   rapportmaand (de laaddatum is de ophaaldatum bij de leverancier en ligt weken voor de rit; een export
+   stopt bij 50.000 rijen, splits dan in twee delen), **Te laden ritten** en **Te lossen ritten**.
 2. Open de tool en sleep alle bestanden tegelijk in het venster. De tool herkent zelf welk bestand wat is.
 3. Controleer de aansluiting per maand en download zo nodig de controlelijst met afwijkende ritten.
 4. Kies de rapportsoort, periode en vergelijking.

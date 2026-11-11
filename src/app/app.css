@@ -343,3 +343,12 @@ input[type="date"] {
 .presenter .thumb:hover .thumb-canvas {
   outline-color: #4fa0d4;
 }
+.callout {
+  margin: 4px 0 12px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--amber);
+  background: #fdf6ec;
+  color: var(--navy);
+  font-size: 13px;
+  max-width: 1000px;
+}

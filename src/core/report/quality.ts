@@ -81,6 +81,8 @@ export type RideIssueKind =
   | "missing-in-unit-file"
   /** Pallets scanned on a ride that is not on the ride lists: not counted. */
   | "not-on-ride-list"
+  /** Not on the ride lists, but scanned within a week of their first/last date: most likely planned just outside the exported period. */
+  | "outside-ride-list-period"
   /** Counted; the number of scanned pallets differs from the list. Slide uses the scans. */
   | "unit-count-differs"
   /** Counted because pallets were scanned, although the list status is open or the reference says cancel. */
@@ -147,10 +149,63 @@ export function rideIssues(
       else kind = "missing-in-unit-file";
       if (kind) issues.push({ ...common, kind });
     }
+    const listDates = [...planned[direction].values()].map((p) => p.plannedDate).filter((d): d is DayKey => d !== null).sort();
+    const listFrom = listDates[0];
+    const listTo = listDates[listDates.length - 1];
+    const nearEdge = (d: DayKey) =>
+      !!listFrom && !!listTo && (Math.abs(Date.parse(d) - Date.parse(listTo)) <= 7 * 86_400_000 || Math.abs(Date.parse(d) - Date.parse(listFrom)) <= 7 * 86_400_000);
     for (const r of rideMap.values()) {
       if (r.listStatus !== "not-on-list" || !inP(r.scanDate)) continue;
-      issues.push({ ...base(r.ritNummer), kind: "not-on-ride-list", plannedDate: null, status: null, referentie: null, listUnits: null });
+      issues.push({
+        ...base(r.ritNummer),
+        kind: nearEdge(r.scanDate) ? "outside-ride-list-period" : "not-on-ride-list",
+        plannedDate: null,
+        status: null,
+        referentie: null,
+        listUnits: null,
+      });
     }
   }
   return issues;
 }
+
+// ---------------------------------------------------------------------------
+// Export advice
+// ---------------------------------------------------------------------------
+
+/**
+ * Pallets are picked up at the supplier (Laaddatum) weeks before they pass the
+ * warehouse: in 2026 the median was 16 days before the outbound ride, 99.9%
+ * within 113 days. An unit export filtered on Laaddatum therefore has to start
+ * well before the first month that is reported.
+ */
+export const LAADDATUM_LEAD_MONTHS = 4;
+
+export interface ExportAdvice {
+  /** Earliest Laaddatum in the unit export. */
+  firstLaaddatum: DayKey;
+  /** First month that does not match. */
+  month: string;
+  /** Laaddatum the unit export should start at to cover that month. */
+  exportFrom: DayKey;
+}
+
+/**
+ * When a month does not match the ride lists and the unit export starts too
+ * late for it, explain that and give the Laaddatum to export from.
+ */
+export function unitExportAdvice(units: readonly WmsUnit[], failingMonths: readonly string[]): ExportAdvice | null {
+  let first: DayKey | null = null;
+  for (const u of units) {
+    if (!u.laaddatum) continue;
+    const k = dayKeyOf(u.laaddatum);
+    if (first === null || k < first) first = k;
+  }
+  if (!first || failingMonths.length === 0) return null;
+  const month = [...failingMonths].sort()[0]!;
+  const [y, m] = month.split("-").map(Number) as [number, number];
+  const from = new Date(Date.UTC(y, m - 1 - LAADDATUM_LEAD_MONTHS, 1)).toISOString().slice(0, 10);
+  return first > from ? { firstLaaddatum: first, month, exportFrom: from } : null;
+}
+
+const dayKeyOf = (d: Date) => d.toISOString().slice(0, 10);

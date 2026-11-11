@@ -7,7 +7,7 @@ import {
   type ComparisonKind,
   type ReportKind,
 } from "../core/period";
-import { comparisonOptionsWithQuality, periodQuality, rideIssues } from "../core/report/quality";
+import { comparisonOptionsWithQuality, LAADDATUM_LEAD_MONTHS, periodQuality, rideIssues, unitExportAdvice } from "../core/report/quality";
 import { reconcileRideLists } from "../core/report/reconcile";
 import { computeReportSet } from "../core/report/report";
 import { coverageFromRideLists, indexPlannedRides } from "../core/wms/rideLists";
@@ -121,6 +121,16 @@ export function App() {
     return r.inbound.perBucket.map((b, i) => ({ key: b.key, from: b.from, to: b.to, inbound: b, outbound: r.outbound.perBucket[i]! }));
   }, [base, dataset]);
 
+  // Months that do not match, and whether the unit export simply starts too late for them.
+  const advice = useMemo(() => {
+    if (!monthly || !dataset) return null;
+    const failing = monthly
+      .filter((m) => m.inbound.unitFileHus + m.outbound.unitFileHus > 0)
+      .filter((m) => [m.inbound.completeness, m.outbound.completeness].some((c) => c !== null && Math.abs(1 - c) > 0.02))
+      .map((m) => m.key);
+    return unitExportAdvice(dataset.units, failing);
+  }, [monthly, dataset]);
+
   // Months for which the unit file holds data (at least half of the expected pallets in both directions).
   const dataRange = useMemo(() => {
     const months = (monthly ?? []).filter((m) => (m.inbound.completeness ?? 0) >= 0.5 && (m.outbound.completeness ?? 0) >= 0.5);
@@ -203,6 +213,17 @@ export function App() {
             Ritdata van {base.coverage?.from} t/m {base.coverage?.to}. Per maand: units op de rittenlijsten tegenover gescande pallets in het
             unitoverzicht. Wijkt een maand meer dan 2% af, dan is die periode niet bruikbaar als vergelijking.
           </p>
+          {advice && (
+            <div className="callout">
+              <strong>
+                {advice.month} sluit niet aan omdat het unitoverzicht te laat begint (laaddatum vanaf {advice.firstLaaddatum}).
+              </strong>{" "}
+              De laaddatum is de ophaaldatum bij de leverancier en ligt weken voor de rit door het magazijn (tot ongeveer{" "}
+              {LAADDATUM_LEAD_MONTHS} maanden). Pallets die eerder zijn opgehaald staan daardoor niet in het bestand. Exporteer het
+              unitoverzicht vanaf laaddatum <strong>{advice.exportFrom}</strong>; bij meer dan 50.000 rijen in twee delen, de tool voegt
+              ze samen.
+            </div>
+          )}
           <table className="grid">
             <thead>
               <tr>

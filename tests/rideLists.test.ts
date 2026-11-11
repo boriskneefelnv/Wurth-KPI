@@ -163,3 +163,27 @@ describe("quality", () => {
     ]);
   });
 });
+
+describe("export advice and period edges", () => {
+  it("explains a month that fails because the unit export starts too late", async () => {
+    const { unitExportAdvice } = await import("@/core/report/quality");
+    const units = [unit({ laaddatum: "2026-01-05", uitslag: "2026-01-20" }), unit({ laaddatum: "2026-03-01", uitslag: "2026-03-10" })];
+    expect(unitExportAdvice(units, ["2026-02", "2026-01"])).toEqual({ firstLaaddatum: "2026-01-05", month: "2026-01", exportFrom: "2025-09-01" });
+    // early enough: no advice
+    expect(unitExportAdvice([unit({ laaddatum: "2025-08-15" })], ["2026-01"])).toBeNull();
+  });
+
+  it("marks rides scanned just outside the ride list period as such", async () => {
+    const { rideIssues } = await import("@/core/report/quality");
+    const planned = indexPlannedRides([parseRideList([laden([[1, "r", "Geladen", 2, "2026-06-01"], [2, "r", "Geladen", 2, "2026-06-30"]])])]);
+    const units = [
+      ...times(2, () => unit({ uitgaandeRit: "1", uitslag: "2026-06-01" })),
+      ...times(2, () => unit({ uitgaandeRit: "2", uitslag: "2026-06-30" })),
+      unit({ uitgaandeRit: "9", uitslag: "2026-06-30" }), // planned 1 July, scanned 30 June
+      unit({ uitgaandeRit: "8", uitslag: "2026-06-15" }), // really missing from the list
+    ];
+    const { rides } = materializeRides(units, { planned });
+    const kinds = rideIssues(units, planned, rides, makePeriod("month", "2026-06")).map((i) => [i.ritNummer, i.kind]);
+    expect(kinds).toEqual(expect.arrayContaining([["9", "outside-ride-list-period"], ["8", "not-on-ride-list"]]));
+  });
+});

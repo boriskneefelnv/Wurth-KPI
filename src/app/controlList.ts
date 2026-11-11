@@ -4,6 +4,7 @@ import type { RideIssue, RideIssueKind } from "../core/report/quality";
 export const ISSUE_LABEL: Record<RideIssueKind, string> = {
   "missing-in-unit-file": "Telt niet mee: afgerond op lijst, geen gescande pallets",
   "not-on-ride-list": "Telt niet mee: pallets gescand, rit niet op lijst",
+  "outside-ride-list-period": "Telt niet mee: rit valt net buiten de periode van de rittenlijst",
   "unit-count-differs": "Telt mee: aantal gescande pallets wijkt af van lijst",
   "counted-open-status": "Telt mee: pallets gescand, status lijst nog open of cancel",
   "not-handled": "Telt niet mee: status open, niets gescand",
