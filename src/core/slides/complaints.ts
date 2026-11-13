@@ -1,4 +1,5 @@
 import { COMPLAINT_CATEGORIES, type ComplaintCategory } from "../complaints/portal";
+import { activeIn, comparableSet } from "./comparable";
 import { bucketIndex, bucketsFor, type ReportPeriod } from "../period";
 import type { ComplaintBlock, ComplaintItem, ComplaintKey, FreeLevel } from "../report/complaints";
 import type { ReportSet } from "../report/report";
@@ -53,7 +54,7 @@ export function complaintsSlide(set: ReportSet): ComplaintsSlideModel | null {
   const views = Object.fromEntries(
     ORDER.map((key) => {
       const k = block.kpi[key];
-      const p = prev?.kpi[key];
+      const p = primary && activeIn(primary.report, key, set.current) ? prev?.kpi[key] : undefined;
       const items = block.items.filter((i) => key === "Total" || i.principal === key);
       const counted = items.filter((i) => i.counted);
       const delta = (a: number | null, b: number | null | undefined) => (a !== null && b !== null && b !== undefined ? a - b : null);

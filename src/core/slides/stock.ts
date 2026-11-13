@@ -1,4 +1,5 @@
 import { eachDay, isoWeek, MONTHS_EN, type ReportPeriod } from "../period";
+import { activeIn, comparableSet } from "./comparable";
 import { deltaPct } from "../report/context";
 import type { ReportSet } from "../report/report";
 import type { StockKey } from "../report/stock";
@@ -67,7 +68,7 @@ export function stockSlide(set: ReportSet): StockSlideModel {
   const views = Object.fromEntries(
     ORDER.map((key) => {
       const a = cur[key];
-      const prev = primary ? primary.report.stock.average[key] : null;
+      const prev = primary && activeIn(primary.report, key, set.current) ? primary.report.stock.average[key] : null;
       const outPerWorkday = set.current.dailyVolume.series[key].avgPerWorkday?.outbound ?? 0;
       const view: StockView = {
         key,
@@ -110,7 +111,7 @@ export function stockSlide(set: ReportSet): StockSlideModel {
       const m = g.key.slice(5);
       const pi = prevDays.map((d, i) => (d.slice(5, 7) === m ? i : -1)).filter((i) => i >= 0);
       for (const k of ORDER) {
-        const v = pi.length ? mean(prevAvg[k].daily, pi) : 0;
+        const v = pi.length && activeIn(primary!.report, k, set.current) ? mean(prevAvg[k].daily, pi) : 0;
         ghost[k] = v > 0 ? v : null;
       }
     }

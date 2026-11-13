@@ -1,4 +1,5 @@
 import type { ReportPeriod } from "../period";
+import { activeIn, comparableSet } from "./comparable";
 import { deltaPct } from "../report/context";
 import { DAILY_KEYS, type DailyKey, type DailyTotals } from "../report/daily";
 import type { ReportSet } from "../report/report";
@@ -61,7 +62,7 @@ export function dailySlide(set: ReportSet): DailySlideModel {
   const views = Object.fromEntries(
     DAILY_KEYS.map((key) => {
       const s = cur.series[key];
-      const prev = primary ? primary.report.dailyVolume.series[key].avgPerWorkday : null;
+      const prev = primary && activeIn(primary.report, key, set.current) ? primary.report.dailyVolume.series[key].avgPerWorkday : null;
       const avgDeltaPct = s.avgPerWorkday && prev && prev.total > 0 ? deltaPct(s.avgPerWorkday.total, prev.total) : null;
       const peak = s.peak ? { ...s.peak, label: longDay(s.peak.day) } : null;
       const peakRatio = peak && s.avgPerWorkday && s.avgPerWorkday.total > 0 ? peak.total / s.avgPerWorkday.total : null;

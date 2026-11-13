@@ -1,4 +1,5 @@
 import type { ReportPeriod } from "../period";
+import { activeIn, comparableSet } from "./comparable";
 import type { DailyKey } from "../report/daily";
 import type { ReportSet } from "../report/report";
 import type { StorageStats } from "../report/storage";
@@ -67,7 +68,7 @@ export function storageSlide(set: ReportSet): StorageSlideModel {
   const views = Object.fromEntries(
     ORDER.map((key) => {
       const s = statsOf(set.current, key);
-      const p = primary ? statsOf(primary.report, key) : null;
+      const p = primary && activeIn(primary.report, key, set.current) ? statsOf(primary.report, key) : null;
       const pUsable = p && p.count > 0 ? p : null;
       const avgDelta = s.avgDays !== null && pUsable?.avgDays != null ? s.avgDays - pUsable.avgDays : null;
       const medianDelta = s.medianDays !== null && pUsable?.medianDays != null ? s.medianDays - pUsable.medianDays : null;

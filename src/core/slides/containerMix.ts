@@ -1,4 +1,5 @@
 import type { ReportPeriod } from "../period";
+import { activeIn, comparableSet } from "./comparable";
 import { deltaPct } from "../report/context";
 import type { ReportSet } from "../report/report";
 import type { ContainerMixBlock } from "../report/workload";
@@ -74,7 +75,7 @@ export function containerMixSlide(set: ReportSet): MixSlideModel {
   const views = Object.fromEntries(
     ORDER.map((key) => {
       const counts = countsOf(cur, key);
-      const pc = prev ? countsOf(prev, key) : null;
+      const pc = prev && primary && activeIn(primary.report, key, set.current) ? countsOf(prev, key) : null;
       const rides = ALL.reduce((a, t) => a + counts[t], 0);
       const prevRides = pc ? ALL.reduce((a, t) => a + pc[t], 0) : 0;
       const share = (n: number) => (rides ? (n / rides) * 100 : null);

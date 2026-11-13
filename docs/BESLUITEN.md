@@ -253,6 +253,7 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B125 | "Unknown" bij de containermix kwam van 14 van de 1.440 ritten (jan t/m sep 2026): 11 retourzendingen ("RETURN AWKG", "RETURN ORDER" in het zegelveld) en 3 ritten waarbij Containertype in de WMS leeg is. Retouren zijn nu een eigen soort "RET, Return to principal"; de rest heet "Type not recorded". |
 | B126 | TEU is vervangen door "HUs per container" (gemiddelde belading per uitgaande rit), op verzoek: TEU is onduidelijk. |
 | B127 | Bij één entiteit geen naamlabel bovenaan en geen legenda-items met alleen die entiteit; on time heet dan "Rides loaded on time" en de dubbele "Total" onder de maanden vervalt. |
+| B128 | Geen vergelijking met een periode waarin de entiteit niet actief was of pas begon (op verzoek): geen volume toen, of niets in de eerste maand (week, dag) en minder dan een kwart van het huidige volume. Geldt per weergave (alle principals, één principal, één entiteit) op alle slides. Zo verdwijnt "+700% vs Jan to Sep 2025" bij AWKG; echte groei van een al actieve entiteit blijft zichtbaar. |
 
 ## Open vragen
 

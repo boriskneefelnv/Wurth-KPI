@@ -1,4 +1,5 @@
 import { comparisonPeriod, type ComparisonKind, type ReportPeriod } from "../period";
+import { activeIn, comparableSet } from "./comparable";
 import type { DayKey, Direction, MainPrincipal } from "../types";
 import { deltaPct } from "../report/context";
 import type { OperationalReport, ReportSet } from "../report/report";
@@ -201,8 +202,10 @@ function texts(
   return { headline, subline, context, peak };
 }
 
-export function volumeSlide(set: ReportSet, subject: VolumeSlideSubject): VolumeSlideModel {
+export function volumeSlide(fullSet: ReportSet, subject: VolumeSlideSubject): VolumeSlideModel {
   const key = SUBJECT_KEY[subject];
+  // Only comparisons with a period in which this entity was really active.
+  const set = comparableSet(fullSet, key);
   const ghost = pickGhost(set);
   const inbound = panel(set, key, "inbound", ghost?.report ?? null);
   const outbound = panel(set, key, "outbound", ghost?.report ?? null);

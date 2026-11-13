@@ -1,4 +1,5 @@
 import type { ComparisonKind, ReportPeriod } from "../period";
+import { activeIn, comparableSet } from "./comparable";
 import type { PunctualityResult } from "../report/punctuality";
 import type { OperationalReport, ReportSet } from "../report/report";
 import type { MainPrincipal } from "../types";
@@ -54,7 +55,10 @@ function pointsWords(d: number): string {
   return `${d > 0 ? "up" : "down"} ${fmtDec(Math.abs(d))} ${Math.abs(d) === 1 ? "point" : "points"}`;
 }
 
-export function punctualitySlide(set: ReportSet, kind: PunctualityKind): PunctualitySlideModel {
+export function punctualitySlide(fullSet: ReportSet, kind: PunctualityKind): PunctualitySlideModel {
+  // Only comparisons with a period in which the principals (or the one entity) were really active.
+  const set = comparableSet(fullSet, "Total");
+  const perPrincipalCmp = fullSet.comparisons.find((c) => c.kind === "lastYear") ?? fullSet.comparisons.find((c) => c.kind === "previous") ?? null;
   const cur = pick(set.current, kind);
   const measured = cur.ok + cur.notOk;
   const period = set.current.period;
@@ -117,7 +121,7 @@ export function punctualitySlide(set: ReportSet, kind: PunctualityKind): Punctua
     deltaLabel: primary?.label ?? null,
     perPrincipal: MAIN_PRINCIPALS.map((p) => {
       const c = cur.perPrincipal[p];
-      const prev = primaryReport ? pick(primaryReport, kind).perPrincipal[p].pct : null;
+      const prev = perPrincipalCmp && activeIn(perPrincipalCmp.report, p, fullSet.current) ? pick(perPrincipalCmp.report, kind).perPrincipal[p].pct : null;
       return { principal: p, pct: c.pct, ok: c.ok, measured: c.ok + c.notOk, deltaPts: c.pct !== null && prev !== null ? c.pct - prev : null };
     }),
     buckets: cur.perBucket.map((b, i) => ({

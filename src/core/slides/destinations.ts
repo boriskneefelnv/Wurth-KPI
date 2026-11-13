@@ -1,4 +1,5 @@
 import type { ReportPeriod } from "../period";
+import { activeIn, comparableSet } from "./comparable";
 import type { ReportSet } from "../report/report";
 import type { StorageDestination } from "../report/storage";
 import { countryName, fmtDec, fmtInt } from "./format";
@@ -61,7 +62,7 @@ export function destinationsSlide(set: ReportSet): DestinationsSlideModel {
       const all = set.current.storageDestinations[key];
       const hus = all.reduce((a, r) => a + r.hus, 0);
       const minHus = Math.max(5, Math.ceil(hus * MIN_SHARE_FOR_EXTREMES));
-      const prev = primary ? primary.report.storageDestinations[key] : [];
+      const prev = primary && activeIn(primary.report, key, set.current) ? primary.report.storageDestinations[key] : [];
       const prevHus = prev.reduce((a, r) => a + r.hus, 0);
       const prevMin = Math.max(5, Math.ceil(prevHus * MIN_SHARE_FOR_EXTREMES));
       const row = (r: StorageDestination): DestinationRow => {

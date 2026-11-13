@@ -66,14 +66,15 @@ describe("volume slide model", () => {
     expect(wiag.subline).toMatch(/^The outbound increase comes mainly from France \(50 more HUs\)\./);
     const awkg = volumeSlide(set, "AWKG");
     expect(awkg.headline).toBe("30 HUs out on 1 ride, 0 HUs in on 0 rides.");
-    expect(awkg.subline).toMatch(/^AWKG had no volume yet in Q2 2025\./);
+    // AWKG had no volume in either comparison period: no comparison at all.
+    expect(awkg.subline).toBe("Busiest day was 10 June with 30 HUs out.");
     expect(`${m.headline} ${m.subline}`).not.toMatch(/[\u2013\u2014\u2212]/);
   });
 
   it("principal slide only counts that principal", () => {
     const m = volumeSlide(set, "AWKG");
     expect(m.outbound.hus).toEqual([0, 0, 30]);
-    expect(m.outbound.comparisons[1]!.husDeltaPct).toBeNull(); // AWKG had nothing last year
+    expect(m.outbound.comparisons).toEqual([]); // AWKG had nothing in either comparison period
   });
 
   it("month report: weekly bars and no ghost bars (weeks do not line up)", () => {
@@ -87,8 +88,11 @@ describe("volume slide model", () => {
   it("week report compares day by day with the previous week", () => {
     const m = volumeSlide(computeReportSet(units, makePeriod("week", "2026-W24"), ["previous"]), "Total");
     expect(m.buckets[0]!.label).toBe("Mon 08-06");
-    expect(m.ghost).toEqual({ kind: "previous", label: "Week 23 2026" });
     expect(m.outbound.hus).toEqual([0, 0, 50, 0, 30, 0, 0]);
+    // Week 23 had no volume: not a meaningful comparison, so no ghost bars.
+    expect(m.ghost).toBeNull();
+    const withPrev = volumeSlide(computeReportSet([...units, ...out("W1", "2026-06-02", 40)], makePeriod("week", "2026-W24"), ["previous"]), "Total");
+    expect(withPrev.ghost).toEqual({ kind: "previous", label: "Week 23 2026" });
   });
 
   it("without comparison it describes the period itself", () => {
@@ -128,5 +132,19 @@ describe("export", () => {
   it("embeds the report as JSON without losing anything", () => {
     const set = computeReportSet(units, makePeriod("quarter", "2026-Q2"), ["previous", "lastYear"]);
     expect(JSON.parse(JSON.stringify(set))).toEqual(set);
+  });
+});
+
+describe("comparisons for an entity that started late", () => {
+  it("are left out; real growth of an active entity is kept", async () => {
+    const { activeIn } = await import("@/core/slides/comparable");
+    // Last year: nothing in April, 10 HUs in June; this year 100 HUs: started during the period.
+    const late = [...out("L1", "2025-06-10", 10, { principal: "AWKG" }), ...out("L2", "2026-04-10", 100, { principal: "AWKG" })];
+    const s1 = computeReportSet(late, makePeriod("quarter", "2026-Q2"), ["lastYear"]);
+    expect(activeIn(s1.comparisons[0]!.report, "AWKG", s1.current)).toBe(false);
+    // Last year 30 HUs from April on, this year 100: growth, comparison kept.
+    const grown = [...out("G1", "2025-04-10", 30, { principal: "AWKG" }), ...out("G2", "2026-04-10", 100, { principal: "AWKG" })];
+    const s2 = computeReportSet(grown, makePeriod("quarter", "2026-Q2"), ["lastYear"]);
+    expect(activeIn(s2.comparisons[0]!.report, "AWKG", s2.current)).toBe(true);
   });
 });
