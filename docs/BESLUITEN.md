@@ -164,6 +164,16 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B86 | Inbound stocked on time: doel is nu **95% binnen één werkdag** na de verwachte losdag (besloten door gebruiker). Het aandeel op de losdag zelf staat als tweede cijfer op de slide (`onPlannedDay`). Instelbaar via `TARGETS.inboundStockedGraceWorkdays`. |
 | B87 | Presentatie: geen onzichtbare klikvlakken meer over de slide (die gaven een focuslijn en blokkeerden de hover op de eerste maand). Een klik op de slide bladert: linkerkwart terug, de rest vooruit. |
 
+## Werkdruk per dag (13 nov)
+
+| # | Besluit |
+|---|---|
+| B88 | Slide "Daily workload" na de volumeslides: HU's per dag als gestapelde staven (inbound donker, outbound licht), met de gemiddelde werkdag als lijn en de drukste dag gelabeld. |
+| B89 | Zelfde datering als de volumeslides (HU op de dag van zijn rit, alleen getelde ritten), dus de dagen tellen op tot de volumetotalen. De oude dagberekening op Losdatum/Laaddatum is vervangen. |
+| B90 | Alle werkdagen van de periode staan op de as (ook dagen zonder volume); weekenddagen en feestdagen alleen als er iets gebeurde. Gemiddelde = totaal / werkdagen. |
+| B91 | Knoppen op de slide (All principals, WIAG, AWKG, Liqui Moly) wisselen kaarten, staven, lijn en tekst; cijfers en staven glijden naar de nieuwe waarden. Werkt ook in de HTML-export; een klik op een knop bladert niet. Print en miniaturen tonen All principals. |
+| B92 | Groei door een principal zonder volume in de vergelijkingsperiode wordt in de tekst benoemd (H1 2026: AWKG was in H1 2025 nog niet actief, vandaar +90%). |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

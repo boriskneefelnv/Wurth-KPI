@@ -239,22 +239,27 @@ describe("stock", () => {
 });
 
 describe("daily volume", () => {
-  it("counts inbound by Losdatum and outbound by Laaddatum, ride units only", () => {
+  it("counts HUs on the day of their ride, per principal, workdays plus active weekend days", () => {
     const units = [
-      unit({ inkomendeRit: "I1", inslag: "2026-04-03", losdatum: "2026-04-02" }),
-      unit({ inkomendeRit: "I1", inslag: "2026-04-03", losdatum: "2026-04-02" }),
-      unit({ uitgaandeRit: "R1", uitslag: "2026-04-03", laaddatum: "2026-04-03" }),
-      unit({ uitslag: "2026-04-03", laaddatum: "2026-04-03" }), // no ride
-      unit({ uitgaandeRit: "R2", uitslag: "2026-05-01", laaddatum: "2026-05-01" }), // other month
+      unit({ inkomendeRit: "I1", inslag: "2026-04-02 08:00", principal: "WIAG" }),
+      unit({ inkomendeRit: "I1", inslag: "2026-04-02 09:00", principal: "WIAG" }),
+      unit({ uitgaandeRit: "R1", uitslag: "2026-04-03", principal: "AWKG" }),
+      unit({ uitgaandeRit: "R3", uitslag: "2026-04-04", principal: "Liqui Moly" }), // Saturday
+      unit({ uitgaandeRit: "R2", uitslag: "2026-05-01", principal: "WIAG" }), // other month
     ];
     const d = computeDailyVolume(ctx(units, ["2026-04"]));
-    expect(d.perDay).toEqual([
-      { day: "2026-04-02", inbound: 2, outbound: 0, total: 2 },
-      { day: "2026-04-03", inbound: 0, outbound: 1, total: 1 },
-    ]);
-    expect(d.avgPerActiveDay!.total).toBe(1.5);
-    expect(d.avgPerWorkday!.total).toBeCloseTo(3 / 20);
-    expect(d.peak).toEqual({ day: "2026-04-02", total: 2 });
+    // April 2026: 20 workdays (Easter Monday and King's Day off) plus the active Saturday.
+    expect(d.days).toHaveLength(21);
+    expect(d.days.find((x) => x.day === "2026-04-04")).toEqual({ day: "2026-04-04", workday: false });
+    expect(d.days.some((x) => x.day === "2026-04-06")).toBe(false);
+    const at = (day: string) => d.days.findIndex((x) => x.day === day);
+    expect(d.series.Total.totals).toEqual({ inbound: 2, outbound: 2, total: 4 });
+    expect(d.series.Total.avgPerWorkday!.total).toBeCloseTo(4 / 20);
+    expect(d.series.Total.peak).toEqual({ day: "2026-04-02", inbound: 2, outbound: 0, total: 2 });
+    expect(d.series.Total.inboundRides[at("2026-04-02")]).toBe(1);
+    expect(d.series.WIAG.totals.total).toBe(2);
+    expect(d.series.AWKG.outbound[at("2026-04-03")]).toBe(1);
+    expect(d.series["Liqui Moly"].peak).toMatchObject({ day: "2026-04-04", outbound: 1 });
   });
 });
 

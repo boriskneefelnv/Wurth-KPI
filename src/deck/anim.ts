@@ -20,6 +20,8 @@ export const ANIM = {
   labelIn: 200,
   labelDelay: 300,
   markerDelay: 650,
+  /** Switching a view on a slide (bars and numbers glide to the new values). */
+  switch: 450,
 } as const;
 
 /** True: everything renders in its final state (export, print, thumbnails). */
@@ -58,12 +60,21 @@ export function useTweenNumber(value: number, duration: number = ANIM.count, del
   const animate = useAnimate();
   const [n, setN] = useState(value);
   const started = useRef(false);
+  const shown = useRef(value);
+  shown.current = n;
   useEffect(() => {
-    if (!animate || started.current) {
+    if (!animate) {
       setN(value);
       return;
     }
+    // First time: count up from 0. Later changes (a view switched on the
+    // slide): glide from the number on screen to the new one.
+    const first = !started.current;
     started.current = true;
+    const from = first ? 0 : shown.current;
+    const dur = first ? duration : ANIM.switch;
+    const wait = first ? delay : 0;
+    if (from === value) return;
     let raf = 0;
     let stopped = false;
     const finish = () => {
@@ -72,12 +83,12 @@ export function useTweenNumber(value: number, duration: number = ANIM.count, del
       setN(value);
     };
     const unregister = registerAnimFinisher(finish);
-    const start = performance.now() + delay;
-    setN(0);
+    const start = performance.now() + wait;
+    setN(from);
     const tick = (now: number) => {
       if (stopped) return;
-      const k = Math.max(0, Math.min(1, (now - start) / duration));
-      setN(value * easeOutCubic(k));
+      const k = Math.max(0, Math.min(1, (now - start) / dur));
+      setN(from + (value - from) * easeOutCubic(k));
       if (k < 1) raf = requestAnimationFrame(tick);
       else setN(value);
     };

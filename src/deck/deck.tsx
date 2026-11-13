@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import type { ReportSet } from "../core/report/report";
+import { dailySlide } from "../core/slides/daily";
 import { punctualitySlide } from "../core/slides/punctuality";
 import { volumeSlide, type VolumeSlideSubject } from "../core/slides/volume";
 import { PunctualitySlide } from "./slides/PunctualitySlide";
 import { ClosingSlide } from "./slides/ClosingSlide";
+import { DailySlide } from "./slides/DailySlide";
 import { CoverSlide } from "./slides/CoverSlide";
 import { DividerSlide } from "./slides/DividerSlide";
 import { VolumeSlide } from "./slides/VolumeSlide";
@@ -54,7 +56,7 @@ export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
       id: "divider-workload",
       title: "Section 01 Workload",
       render: (page, total) => (
-        <DividerSlide number="01" title="Workload" subtitle="Volume per principal and on time performance." footer={footer} page={page} total={total} />
+        <DividerSlide number="01" title="Workload" subtitle="Volume per principal, daily workload and on time performance." footer={footer} page={page} total={total} />
       ),
     },
     ...subjects.map(({ id, subject }) => ({
@@ -62,6 +64,11 @@ export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
       title: subject === "Total" ? "Total volume" : `${subject} volume`,
       render: (page: number, total: number) => <VolumeSlide model={volumeSlide(set, subject)} page={page} total={total} />,
     })),
+    {
+      id: "daily-workload",
+      title: "Daily workload",
+      render: (page: number, total: number) => <DailySlide model={dailySlide(set)} page={page} total={total} />,
+    },
     {
       id: "on-time-loading",
       title: "On time loading",

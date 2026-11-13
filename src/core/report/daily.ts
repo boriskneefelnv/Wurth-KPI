@@ -1,55 +1,98 @@
-import { dayKey } from "../dates";
-import type { DayKey } from "../types";
-import type { ReportContext } from "./context";
+import { eachDay, isWorkday } from "../period";
+import type { DayKey, Direction, MainPrincipal } from "../types";
+import { MAIN_PRINCIPALS } from "../types";
+import { selectedRides, type ReportContext } from "./context";
+
+export type DailyKey = MainPrincipal | "Total";
+export const DAILY_KEYS: DailyKey[] = [...MAIN_PRINCIPALS, "Total"];
+
+export interface DailyTotals {
+  inbound: number;
+  outbound: number;
+  total: number;
+}
+
+export interface DailySeries {
+  /** HUs per day (same order as DailyVolumeBlock.days). */
+  inbound: number[];
+  outbound: number[];
+  /** Rides per day; a ride with several principals counts for each of them, once in the total. */
+  inboundRides: number[];
+  outboundRides: number[];
+  totals: DailyTotals;
+  /** Totals / workdays in the period (weekend activity included in the totals). */
+  avgPerWorkday: DailyTotals | null;
+  /** Busiest day by HUs in and out (first one on ties). */
+  peak: ({ day: DayKey } & DailyTotals) | null;
+}
 
 export interface DailyVolumeBlock {
-  /** Only days with activity, chronological. */
-  perDay: { day: DayKey; inbound: number; outbound: number; total: number }[];
-  totals: { inbound: number; outbound: number; total: number };
-  /** Average over days with recorded activity. */
-  avgPerActiveDay: { inbound: number; outbound: number; total: number } | null;
-  /** Average over workdays (Mon–Fri, minus holidays) in the period. */
-  avgPerWorkday: { inbound: number; outbound: number; total: number } | null;
-  peak: { day: DayKey; total: number } | null;
+  /** Every workday of the period plus weekend days and holidays with activity, chronological. */
+  days: { day: DayKey; workday: boolean }[];
+  series: Record<DailyKey, DailySeries>;
 }
 
 /**
- * Physical HU movements per day: inbound by Losdatum (unloading), outbound by
- * Laaddatum (loading). Deliberately different dates than the workload slides.
- * Only HUs on a ride are counted.
+ * HUs handled per day, inbound and outbound, in total and per main principal.
+ * Dated exactly like the volume slides (an HU counts on the day of its ride,
+ * see ReportContext.unitDay), so the days add up to the volume totals.
  */
 export function computeDailyVolume(ctx: ReportContext): DailyVolumeBlock {
-  const days = new Map<DayKey, { inbound: number; outbound: number }>();
-  const add = (d: Date, dir: "inbound" | "outbound") => {
-    if (!ctx.inPeriod(d)) return;
-    const k = dayKey(d);
-    let e = days.get(k);
-    if (!e) days.set(k, (e = { inbound: 0, outbound: 0 }));
-    e[dir]++;
-  };
-  for (const u of ctx.units) {
-    if (u.losdatum && u.inkomendeRit) add(u.losdatum, "inbound");
-    if (u.laaddatum && u.uitgaandeRit) add(u.laaddatum, "outbound");
+  const all = eachDay(ctx.period);
+  const index = new Map(all.map((d, i) => [d, i]));
+  const zeros = () => all.map(() => 0);
+  const raw = Object.fromEntries(
+    DAILY_KEYS.map((k) => [k, { inbound: zeros(), outbound: zeros(), inboundRides: zeros(), outboundRides: zeros() }]),
+  ) as Record<DailyKey, Record<"inbound" | "outbound" | "inboundRides" | "outboundRides", number[]>>;
+  const isMain = (p: string): p is MainPrincipal => (MAIN_PRINCIPALS as readonly string[]).includes(p);
+
+  for (const direction of ["inbound", "outbound"] as Direction[]) {
+    for (const u of ctx.units) {
+      const day = ctx.unitDay(u, direction);
+      const i = day === null ? undefined : index.get(day);
+      if (i === undefined) continue;
+      raw.Total[direction][i]!++;
+      if (isMain(u.principal)) raw[u.principal][direction][i]!++;
+    }
+    const rideKey = direction === "inbound" ? "inboundRides" : "outboundRides";
+    for (const ride of selectedRides(ctx, direction)) {
+      const i = index.get(ride.canonicalDate);
+      if (i === undefined) continue;
+      raw.Total[rideKey][i]!++;
+      for (const p of ride.principals) if (isMain(p)) raw[p][rideKey][i]!++;
+    }
   }
 
-  const perDay = [...days]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([day, e]) => ({ day, inbound: e.inbound, outbound: e.outbound, total: e.inbound + e.outbound }));
-  const totals = perDay.reduce(
-    (t, d) => ({ inbound: t.inbound + d.inbound, outbound: t.outbound + d.outbound, total: t.total + d.total }),
-    { inbound: 0, outbound: 0, total: 0 },
-  );
-  const avg = (n: number) =>
-    n > 0 ? { inbound: totals.inbound / n, outbound: totals.outbound / n, total: totals.total / n } : null;
+  // Keep workdays, and other days only when something happened.
+  const keep = all.map((d, i) => isWorkday(d, ctx.holidays) || raw.Total.inbound[i]! + raw.Total.outbound[i]! + raw.Total.inboundRides[i]! + raw.Total.outboundRides[i]! > 0);
+  const days = all.flatMap((d, i) => (keep[i] ? [{ day: d, workday: isWorkday(d, ctx.holidays) }] : []));
+  const pick = (xs: number[]) => xs.filter((_, i) => keep[i]);
 
-  let peak: DailyVolumeBlock["peak"] = null;
-  for (const d of perDay) if (!peak || d.total > peak.total) peak = { day: d.day, total: d.total };
+  const series = Object.fromEntries(
+    DAILY_KEYS.map((k) => {
+      const r = raw[k];
+      const inbound = pick(r.inbound);
+      const outbound = pick(r.outbound);
+      const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+      const totals = { inbound: sum(inbound), outbound: sum(outbound), total: sum(inbound) + sum(outbound) };
+      let peak: DailySeries["peak"] = null;
+      days.forEach(({ day }, i) => {
+        const t = inbound[i]! + outbound[i]!;
+        if (t > 0 && (!peak || t > peak.total)) peak = { day, inbound: inbound[i]!, outbound: outbound[i]!, total: t };
+      });
+      const w = ctx.workdays;
+      const s: DailySeries = {
+        inbound,
+        outbound,
+        inboundRides: pick(r.inboundRides),
+        outboundRides: pick(r.outboundRides),
+        totals,
+        avgPerWorkday: w > 0 ? { inbound: totals.inbound / w, outbound: totals.outbound / w, total: totals.total / w } : null,
+        peak,
+      };
+      return [k, s];
+    }),
+  ) as Record<DailyKey, DailySeries>;
 
-  return {
-    perDay,
-    totals,
-    avgPerActiveDay: avg(perDay.length),
-    avgPerWorkday: avg(ctx.workdays),
-    peak,
-  };
+  return { days, series };
 }
