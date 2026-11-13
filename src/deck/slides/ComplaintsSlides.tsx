@@ -1,0 +1,312 @@
+import { useState } from "react";
+import type { ComplaintCategory } from "../../core/complaints/portal";
+import type { ComplaintKey } from "../../core/report/complaints";
+import type { ComplaintsSlideModel, ComplaintsView } from "../../core/slides/complaints";
+import { fmtDec, fmtInt } from "../../core/slides/format";
+import { ANIM, entry, useAnimate, useTweenNumber } from "../anim";
+import { PrincipalToggle } from "../PrincipalToggle";
+import { SlideShell } from "../SlideShell";
+import { FONT, T } from "../tokens";
+
+const ORIGIN = { sales: "#2A7AB0", vendor: "#1E5478", unassessed: "#B8C4D0" } as const;
+const VERDICT = { accepted: "#D4884A", open: "#7F9BB5", denied: "#DCE3EA" } as const;
+const BELOW = "#B5652B";
+
+function useView(model: ComplaintsSlideModel) {
+  const [key, setKey] = useState<ComplaintKey>("Total");
+  const toggle = <PrincipalToggle options={model.order.map((k) => ({ key: k, label: model.views[k].label }))} selected={key} onSelect={setKey} />;
+  return { view: model.views[key], toggle };
+}
+
+/** Complaints: rides and HUs without complaint against the target, complaints per month by Sales and Vendor. */
+export function ComplaintsOverviewSlide({ model, page, total }: { model: ComplaintsSlideModel; page: number; total: number }) {
+  const { view, toggle } = useView(model);
+  return (
+    <SlideShell title="Complaints" topBar={toggle} page={page} total={total}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
+        <PctCard index={0} label="Rides without complaint" level={view.rides} target={model.target} unit="rides" deltaLabel={model.comparisonLabel} />
+        <PctCard index={1} label="HUs without complaint" level={view.hus} target={model.target} unit="HUs" deltaLabel={model.comparisonLabel} />
+        <CountCard index={2} label="Complaints" value={view.counted} sub={[view.warehouse ? `${view.warehouse} in the warehouse` : null, view.denied ? `${view.denied} denied, not counted` : null].filter(Boolean).join(" · ") || "Not denied"} />
+        <CountCard index={3} label="Pallets affected" value={view.palletsAffected} sub={view.open ? `${view.open} not assessed yet` : "In complaints that count"} />
+      </div>
+      <PerMonth model={model} view={view} />
+    </SlideShell>
+  );
+}
+
+/** Complaints by type (accepted, not assessed, denied) and the latest complaints. */
+export function ComplaintsByTypeSlide({ model, page, total }: { model: ComplaintsSlideModel; page: number; total: number }) {
+  const { view, toggle } = useView(model);
+  return (
+    <SlideShell title="Complaints by type" topBar={toggle} page={page} total={total}>
+      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1fr 1.15fr", gap: 14 }}>
+        <ByType view={view} />
+        <Latest view={view} />
+      </div>
+    </SlideShell>
+  );
+}
+
+function Shell({ index, accent, children }: { index: number; accent?: string; children: React.ReactNode }) {
+  const animate = useAnimate();
+  const delay = index * ANIM.cardStagger;
+  return (
+    <div style={{ background: T.card, borderRadius: 6, boxShadow: T.cardShadow, borderTop: `3px solid ${accent ?? T.heroText}`, padding: "11px 16px", display: "flex", justifyContent: "space-between", ...entry(animate, "deckRiseIn", ANIM.cardIn, delay) }}>
+      {children}
+    </div>
+  );
+}
+
+const cap = { fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: T.inbound, textTransform: "uppercase" as const, whiteSpace: "nowrap" as const };
+
+function PctCard({ index, label, level, target, unit, deltaLabel }: { index: number; label: string; level: ComplaintsView["rides"]; target: number; unit: string; deltaLabel: string | null }) {
+  const animate = useAnimate();
+  const n = useTweenNumber(level.pct ?? 0, ANIM.count, index * ANIM.cardStagger);
+  const below = level.pct !== null && level.pct < target;
+  const d = level.deltaPts;
+  return (
+    <Shell index={index}>
+      <div>
+        <div style={cap}>{label}</div>
+        <div style={{ fontSize: 30, fontWeight: 700, color: below ? BELOW : T.heroText, lineHeight: 1.05, marginTop: 5, fontVariantNumeric: "tabular-nums" }}>{level.pct === null ? "n/a" : `${fmtDec(n)}%`}</div>
+        <div style={{ fontSize: 11, color: T.textSecondary, marginTop: 4 }}>
+          {fmtInt(level.affected)} of {fmtInt(level.total)} {unit} with a complaint
+        </div>
+        <div style={{ marginTop: 6, minHeight: 19, ...entry(animate, "deckFadeIn", ANIM.badgeIn, ANIM.badgeDelay) }}>
+          {d !== null && deltaLabel && (
+            <span style={{ display: "inline-flex", gap: 5, padding: "2px 8px", borderRadius: 10, fontSize: 10.5, whiteSpace: "nowrap", ...(Math.abs(d) < 0.05 ? { background: "#E9EFF5", color: "#475569" } : d > 0 ? { background: "#E8F4E1", color: "#3D7F1F" } : { background: "#FBEFE4", color: BELOW }) }}>
+              <strong>{Math.abs(d) < 0.05 ? "0,0" : `${d > 0 ? "+" : "-"}${fmtDec(Math.abs(d))}`} pts</strong>
+              <span style={{ opacity: 0.85 }}>{deltaLabel}</span>
+            </span>
+          )}
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+        <span style={{ fontSize: 11, color: T.textSecondary }}>Target {target}%</span>
+        {level.pct !== null && (
+          <span style={{ padding: "3px 9px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: below ? "#FBEFE4" : "#E8F4E1", color: below ? BELOW : "#3D7F1F" }}>{below ? "Below target" : "Achieved"}</span>
+        )}
+      </div>
+    </Shell>
+  );
+}
+
+function CountCard({ index, label, value, sub }: { index: number; label: string; value: number; sub: string }) {
+  const n = useTweenNumber(value, ANIM.count, index * ANIM.cardStagger);
+  return (
+    <Shell index={index}>
+      <div>
+        <div style={cap}>{label}</div>
+        <div style={{ fontSize: 30, fontWeight: 700, color: T.heroText, lineHeight: 1.05, marginTop: 5, fontVariantNumeric: "tabular-nums" }}>{fmtInt(n)}</div>
+        <div style={{ fontSize: 11, color: T.textSecondary, marginTop: 4, whiteSpace: "nowrap" }}>{sub}</div>
+      </div>
+    </Shell>
+  );
+}
+
+function Legend({ color, label, line }: { color: string; label: string; line?: boolean }) {
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {line ? <span style={{ width: 16, borderTop: `2px dashed ${color}` }} /> : <span style={{ width: 11, height: 11, borderRadius: 2, background: color }} />}
+      {label}
+    </span>
+  );
+}
+
+function PerMonth({ model, view }: { model: ComplaintsSlideModel; view: ComplaintsView }) {
+  const animate = useAnimate();
+  const [hover, setHover] = useState<number | null>(null);
+  const bs = view.buckets;
+  const n = bs.length;
+  const totals = bs.map((b) => b.sales + b.vendor + b.unassessed);
+  const top = Math.max(4, ...totals);
+  const step = top <= 5 ? 1 : top <= 10 ? 2 : top <= 25 ? 5 : 10;
+  const max = Math.ceil((top + 0.5) / step) * step;
+  const ticks: number[] = [];
+  for (let t = 0; t <= max; t += step) ticks.push(t);
+  const PLOT_H = 250;
+  const barW = n <= 4 ? 64 : n <= 7 ? 52 : n <= 10 ? 40 : n <= 13 ? 30 : 12;
+  const h = (v: number) => (v / max) * PLOT_H;
+  const glide = `height ${ANIM.switch}ms ease-out, bottom ${ANIM.switch}ms ease-out`;
+  const per = model.period.kind === "week" ? "Per day" : model.period.kind === "month" ? "Per week" : "Per month";
+  return (
+    <div style={{ flex: 1, minHeight: 0, background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "14px 22px 10px", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: T.textSecondary }}>{per} · complaints that count, rides without complaint below</div>
+        <div style={{ display: "flex", gap: 16, fontSize: 11, fontWeight: 500, color: T.heroText }}>
+          <Legend color={ORIGIN.sales} label="Sales (Würth's customer)" />
+          <Legend color={ORIGIN.vendor} label="Vendor (Würth)" />
+          <Legend color={ORIGIN.unassessed} label="Not assessed" />
+        </div>
+      </div>
+      <div style={{ display: "flex" }}>
+        <div style={{ width: 40, position: "relative", height: PLOT_H }}>
+          {ticks.map((t) => (
+            <div key={t} style={{ position: "absolute", right: 10, top: PLOT_H - h(t) - 6, fontSize: 10, color: T.axis }}>
+              {t}
+            </div>
+          ))}
+        </div>
+        <div style={{ flex: 1, position: "relative" }}>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: PLOT_H }}>
+            {ticks.map((t) => (
+              <div key={t} style={{ position: "absolute", left: 0, right: 0, top: PLOT_H - h(t), borderTop: `1px dashed ${T.gridline}`, opacity: t === 0 ? 1 : 0.5 }} />
+            ))}
+          </div>
+          <div style={{ position: "relative", height: PLOT_H, display: "flex", justifyContent: "space-around", alignItems: "flex-end" }}>
+            {bs.map((b, i) => {
+              const delay = i * ANIM.barStagger;
+              const parts: [keyof typeof ORIGIN, number][] = [
+                ["vendor", b.vendor],
+                ["sales", b.sales],
+                ["unassessed", b.unassessed],
+              ];
+              let base = 0;
+              return (
+                <div key={b.key} style={{ position: "relative", width: barW, height: PLOT_H }} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
+                  <div style={{ position: "absolute", inset: 0, transformOrigin: "bottom", ...(animate ? { transform: "scaleY(0)", animation: `deckBarGrow ${ANIM.barGrow}ms ${delay}ms ease-out forwards` } : {}) }}>
+                    {parts.map(([k, v]) => {
+                      const bottom = h(base);
+                      base += v;
+                      return v > 0 ? <div key={k} style={{ position: "absolute", left: 0, width: barW, bottom, height: h(v), background: ORIGIN[k], borderTop: "1px solid #fff", transition: glide }} /> : null;
+                    })}
+                  </div>
+                  {totals[i]! > 0 && (
+                    <div style={{ position: "absolute", bottom: h(totals[i]!) + 4, left: barW / 2 - 20, width: 40, textAlign: "center", fontSize: 11, fontWeight: 700, color: T.heroText, transition: glide, ...entry(animate, "deckFadeIn", ANIM.labelIn, delay + ANIM.barGrow) }}>
+                      {totals[i]}
+                    </div>
+                  )}
+                  {hover === i && (
+                    <div style={{ position: "absolute", bottom: Math.min(PLOT_H - 80, h(totals[i]!) + 24), left: barW / 2 - 95, width: 190, zIndex: 20, background: "#fff", border: `1px solid ${T.inbound}`, boxShadow: "0 4px 12px rgba(12,58,92,0.15)", padding: "8px 10px", fontSize: 11, color: T.heroText, fontFamily: FONT, pointerEvents: "none" }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>{b.label}</div>
+                      {[
+                        ["Sales", b.sales],
+                        ["Vendor", b.vendor],
+                        ["Not assessed", b.unassessed],
+                      ].map(([l, v]) => (
+                        <div key={l as string} style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span>{l}</span>
+                          <strong>{v}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-around", marginTop: 8 }}>
+            {bs.map((b) => (
+              <div key={b.key} style={{ width: Math.max(barW, 60), textAlign: "center", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: T.heroText }}>{b.label}</div>
+                <div style={{ fontSize: 10.5, marginTop: 2, color: b.ridesPct !== null && b.ridesPct < model.target ? BELOW : T.textSecondary }}>{b.ridesPct === null ? "" : `${fmtDec(b.ridesPct)}%`}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const CATEGORY_LABEL: Record<ComplaintCategory, string> = {
+  Damage: "Damage",
+  Stowing: "Stowing",
+  "Missing or not loaded": "Missing or not loaded",
+  "Dangerous goods and labels": "Dangerous goods and labels",
+  "Process and documents": "Process and documents",
+  Other: "Other",
+};
+
+function ByType({ view }: { view: ComplaintsView }) {
+  const animate = useAnimate();
+  const max = Math.max(1, ...view.categories.map((c) => c.total));
+  const pct = (v: number) => `${(v / max) * 100}%`;
+  const glide = `width ${ANIM.switch}ms ease-out, left ${ANIM.switch}ms ease-out`;
+  return (
+    <div style={{ background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "14px 20px", display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: T.textSecondary }}>All complaints by type</div>
+        <div style={{ display: "flex", gap: 12, fontSize: 11, fontWeight: 500, color: T.heroText }}>
+          <Legend color={VERDICT.accepted} label="Accepted" />
+          <Legend color={VERDICT.open} label="Not assessed" />
+          <Legend color={VERDICT.denied} label="Denied" />
+        </div>
+      </div>
+      {view.categories.length === 0 && <div style={{ fontSize: 13, color: T.textSecondary }}>No complaints in this period.</div>}
+      {view.categories.map((c, i) => {
+        let left = 0;
+        const parts: [keyof typeof VERDICT, number][] = [
+          ["accepted", c.accepted],
+          ["open", c.open],
+          ["denied", c.denied],
+        ];
+        return (
+          <div key={c.category} style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: T.heroText, marginBottom: 5 }}>
+              <span style={{ fontWeight: 500 }}>{CATEGORY_LABEL[c.category]}</span>
+              <strong style={{ fontVariantNumeric: "tabular-nums" }}>{c.total}</strong>
+            </div>
+            <div style={{ position: "relative", height: 16, background: "#F3F6F9", borderRadius: 2 }}>
+              <div style={{ position: "absolute", inset: 0, transformOrigin: "left", ...(animate ? { transform: "scaleX(0)", animation: `deckGrowX ${ANIM.barGrow}ms ${i * ANIM.barStagger}ms ease-out forwards` } : {}) }}>
+                {parts.map(([k, v]) => {
+                  const l = left;
+                  left += v;
+                  return v > 0 ? <div key={k} title={`${k}: ${v}`} style={{ position: "absolute", top: 0, bottom: 0, left: pct(l), width: pct(v), background: VERDICT[k], borderRight: "1px solid #fff", transition: glide }} /> : null;
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const VERDICT_LABEL = { accepted: "Accepted", open: "Not assessed", denied: "Denied" } as const;
+
+function Latest({ view }: { view: ComplaintsView }) {
+  const animate = useAnimate();
+  const rows = view.latest.slice(0, 11);
+  const cols = "62px 70px 1fr 92px";
+  return (
+    <div style={{ background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "14px 20px", display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 8 }}>
+        Latest complaints{view.latest.length > rows.length ? ` · ${rows.length} of ${view.latest.length}` : ""}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: cols, columnGap: 10, fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: T.textSecondary, paddingBottom: 4 }}>
+        <span>Date</span>
+        <span>Principal</span>
+        <span>Subject</span>
+        <span style={{ textAlign: "right" }}>Status</span>
+      </div>
+      {rows.map((c, i) => (
+        <div
+          key={c.klachtnr}
+          title={`Complaint ${c.klachtnr}${c.ritNummer ? ` · ride ${c.ritNummer}` : ""}${c.origin ? ` · ${c.origin === "sales" ? "Sales" : "Vendor"}` : ""}`}
+          style={{ display: "grid", gridTemplateColumns: cols, columnGap: 10, alignItems: "center", height: 37, borderTop: "1px solid #EEF2F6", fontSize: 11.5, color: T.heroText, ...entry(animate, "deckFadeIn", 220, 200 + i * 50) }}
+        >
+          <span style={{ fontVariantNumeric: "tabular-nums", color: T.textSecondary }}>{`${c.day.slice(8)}-${c.day.slice(5, 7)}`}</span>
+          <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{c.principal ?? ""}</span>
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cleanSubject(c.subject)}</span>
+          <span style={{ justifySelf: "end", padding: "2px 8px", borderRadius: 10, fontSize: 10.5, fontWeight: 600, whiteSpace: "nowrap", background: c.verdict === "accepted" ? "#FBEFE4" : c.verdict === "denied" ? "#EEF2F6" : "#F1F4F8", color: c.verdict === "accepted" ? BELOW : "#475569" }}>
+            {VERDICT_LABEL[c.verdict]}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The subject without ride and order numbers: those are in the tooltip. */
+function cleanSubject(s: string): string {
+  const t = s
+    .replace(/\b[A-Z]?\d{6,}\b/g, "")
+    .replace(/\b(order|rit|dossier)\s*(?=[.,/]|$)/gi, "")
+    .replace(/\s+([.,])/g, "$1")
+    .replace(/(^|[.,/]\s*)[.,/]+/g, "$1")
+    .replace(/[/.,\s]+$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}

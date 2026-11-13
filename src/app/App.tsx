@@ -30,7 +30,7 @@ import type { Dataset, FileInfo } from "./load";
 
 const KIND_LABEL: Record<ReportKind, string> = { week: "Week", month: "Maand", quarter: "Kwartaal", half: "Half jaar", year: "Jaar", ytd: "Jaar tot nu toe" };
 const COMPARISON_LABEL: Record<ComparisonKind, string> = { previous: "Vorige periode", lastYear: "Zelfde periode vorig jaar" };
-const FILE_KIND_LABEL = { units: "Unitoverzicht", "ride-list-outbound": "Te laden ritten", "ride-list-inbound": "Te lossen ritten" } as const;
+const FILE_KIND_LABEL = { units: "Unitoverzicht", "ride-list-outbound": "Te laden ritten", "ride-list-inbound": "Te lossen ritten", complaints: "Klachten" } as const;
 
 const nl = (x: number) => x.toLocaleString("nl-NL");
 /** 2025-09-01 → 01-09-2025 (as typed in the WMS). */
@@ -204,7 +204,8 @@ export function App() {
   const reportSet = useMemo(() => {
     if (!period || !dataset || !base) return null;
     const data = focus ? focusOn(dataset.units, base.rides, focus) : { units: dataset.units, rides: base.rides };
-    return computeReportSet(data.units, period, usable, {}, data.rides);
+    const complaints = dataset.complaints.length ? dataset.complaints.filter((c) => !focus || c.principal === focus) : undefined;
+    return computeReportSet(data.units, period, usable, {}, data.rides, complaints);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, dataset, base, usable.join(","), focus]);
   const slides: SlideDef[] = useMemo(
@@ -236,6 +237,8 @@ export function App() {
       { kind: "ride-list-outbound" as const, label: "Te laden ritten", field: "Verwachte datum", required: req.rides, ...status("ride-list-outbound", req.rides) },
       { kind: "ride-list-inbound" as const, label: "Te lossen ritten", field: "Verwachte datum", required: req.rides, ...status("ride-list-inbound", req.rides) },
       { kind: "units" as const, label: "Unitoverzicht", field: "Laaddatum", required: req.units, ...status("units", req.units) },
+      // Optional; complaints are sparse, so there is no gap check: loaded is enough.
+      { kind: "complaints" as const, label: "Klachten (optioneel)", field: "Datum incident", required: req.rides, loaded: files.some((f) => f.kind === "complaints"), missing: [] as DateSpan[], cutAt: [] as string[] },
     ];
   }, [dataset, req]);
 

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { ReportSet } from "../core/report/report";
 import type { MainPrincipal } from "../core/types";
+import { complaintsSlide } from "../core/slides/complaints";
 import { containerMixSlide } from "../core/slides/containerMix";
 import { dailySlide } from "../core/slides/daily";
 import { punctualitySlide } from "../core/slides/punctuality";
@@ -15,6 +16,7 @@ import { StorageSlide } from "./slides/StorageSlide";
 import { DestinationsSlide } from "./slides/DestinationsSlide";
 import { WorldMapSlide } from "./slides/WorldMapSlide";
 import { ClosingSlide } from "./slides/ClosingSlide";
+import { ComplaintsByTypeSlide, ComplaintsOverviewSlide } from "./slides/ComplaintsSlides";
 import { ContainerMixSlide } from "./slides/ContainerMixSlide";
 import { DailySlide } from "./slides/DailySlide";
 import { CoverSlide } from "./slides/CoverSlide";
@@ -54,6 +56,7 @@ export function longDate(d: Date): string {
  */
 export function buildDeck(set: ReportSet, meetingDate: Date, focus: MainPrincipal | null = null): SlideDef[] {
   const p = set.current.period;
+  const complaints = complaintsSlide(set);
   const who = focus ?? "Würth";
   const footer = `QBR Neele-Vat × ${who} · ${p.label}`;
   const subjects: { id: string; subject: VolumeSlideSubject }[] = focus
@@ -129,6 +132,18 @@ export function buildDeck(set: ReportSet, meetingDate: Date, focus: MainPrincipa
       title: "Storage per destination",
       render: (page: number, total: number) => <DestinationsSlide model={destinationsSlide(set)} page={page} total={total} />,
     },
+    // Quality: only with a complaints export.
+    ...(complaints
+      ? [
+          {
+            id: "divider-quality",
+            title: "Section 03 Quality",
+            render: (page: number, total: number) => <DividerSlide number="03" title="Quality" subtitle="Complaints, by whom and of what kind." footer={footer} page={page} total={total} />,
+          },
+          { id: "complaints", title: "Complaints", render: (page: number, total: number) => <ComplaintsOverviewSlide model={complaints} page={page} total={total} /> },
+          { id: "complaints-type", title: "Complaints by type", render: (page: number, total: number) => <ComplaintsByTypeSlide model={complaints} page={page} total={total} /> },
+        ]
+      : []),
     { id: "closing", title: "Closing", render: () => <ClosingSlide footer={`${focus ? `Würth ${focus}` : "Würth"} · ${p.label}`} /> },
   ];
 }

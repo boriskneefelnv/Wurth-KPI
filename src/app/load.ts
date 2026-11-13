@@ -6,10 +6,11 @@ import { readXlsx } from "../core/wms/xlsxReader";
 import { dayKey } from "../core/dates";
 import { fileSpan, type FileSpan } from "../core/wms/requirements";
 import type { WmsUnit } from "../core/types";
+import { isComplaintsExport, parseComplaints, type PortalComplaint } from "../core/complaints/portal";
 
 export interface FileInfo {
   name: string;
-  kind: ExportKind | null;
+  kind: ExportKind | "complaints" | null;
   rows: number;
   /** Rows taken over from this file (unit exports overlap). */
   added?: number;
@@ -26,12 +27,15 @@ export interface Dataset {
   units: WmsUnit[];
   validation: EnrichValidation | null;
   lists: ParsedRideList[];
+  /** From the complaints portal export (optional). */
+  complaints: PortalComplaint[];
 }
 
 interface Entry {
   info: FileInfo;
   parsed?: ParsedWms;
   list?: ParsedRideList;
+  complaints?: PortalComplaint[];
 }
 
 function laaddatums(p: ParsedWms): string[] {
@@ -58,8 +62,13 @@ export class ExportStore {
       const entry: Entry = { info };
       try {
         const sheets = await readXlsx(new Uint8Array(f.data));
-        info.kind = detectExport(sheets);
-        if (info.kind === "units") {
+        info.kind = isComplaintsExport(sheets) ? "complaints" : detectExport(sheets);
+        if (info.kind === "complaints") {
+          entry.complaints = parseComplaints(sheets);
+          info.rows = entry.complaints.length;
+          const days = entry.complaints.map((c) => c.incidentDay).filter((d): d is string => d !== null).sort();
+          info.span = days.length ? { from: days[0]!, to: days[days.length - 1]!, capped: false } : null;
+        } else if (info.kind === "units") {
           entry.parsed = parseWmsSheets(sheets);
           info.rows = entry.parsed.rows.length;
           info.capped = entry.parsed.rows.length >= WMS_EXPORT_ROW_LIMIT;
@@ -71,7 +80,7 @@ export class ExportStore {
           const dates = entry.list.rides.map((r) => r.plannedDate).filter((d): d is string => d !== null).sort();
           info.span = dates.length ? { from: dates[0]!, to: dates[dates.length - 1]!, capped: info.capped } : null;
         } else {
-          info.error = "Niet herkend als unitoverzicht, Te laden of Te lossen.";
+          info.error = "Niet herkend als unitoverzicht, Te laden, Te lossen of klachtenexport.";
         }
       } catch (e) {
         info.error = e instanceof Error ? e.message : String(e);
@@ -91,13 +100,15 @@ export class ExportStore {
   dataset(progress: (msg: string) => void = () => {}): Dataset {
     const all = [...this.entries.values()];
     const lists = all.flatMap((e) => (e.list ? [e.list] : []));
+    // Several complaint exports: the same complaint number once (the last file wins).
+    const complaints = [...new Map(all.flatMap((e) => e.complaints ?? []).map((c) => [c.klachtnr, c])).values()];
     const unitEntries = all.filter((e) => e.parsed);
-    if (unitEntries.length === 0) return { files: all.map((e) => e.info), units: [], validation: null, lists };
+    if (unitEntries.length === 0) return { files: all.map((e) => e.info), units: [], validation: null, lists, complaints };
     progress("Unitoverzichten samenvoegen en controleren…");
     const merged = mergeWmsExports(unitEntries.map((e) => e.parsed!));
     merged.sources.forEach((s, i) => (unitEntries[i]!.info.added = s.added));
     const enriched = enrichWms(merged);
-    return { files: all.map((e) => e.info), units: enriched.units, validation: enriched.validation, lists };
+    return { files: all.map((e) => e.info), units: enriched.units, validation: enriched.validation, lists, complaints };
   }
 }
 

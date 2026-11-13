@@ -9,6 +9,8 @@ import { computeFlow, computeProfiles, type FlowBlock, type PrincipalProfile } f
 import { computeInboundStocked, computeOnTimeLoading, type PunctualityResult } from "./punctuality";
 import { computeStock, type StockBlock } from "./stock";
 import { computeOutboundCountries, type OutboundCountry } from "./countries";
+import { computeComplaints, type ComplaintBlock } from "./complaints";
+import type { PortalComplaint } from "../complaints/portal";
 import { computeStorage, computeStorageDestinations, type StorageBlock, type StorageDestinationsBlock } from "./storage";
 import {
   computeContainerMix,
@@ -38,6 +40,8 @@ export interface OperationalReport {
   storage: StorageBlock;
   storageDestinations: StorageDestinationsBlock;
   outboundCountries: OutboundCountry[];
+  /** Null when no complaints export was loaded. */
+  complaints: ComplaintBlock | null;
   stock: StockBlock;
   flow: FlowBlock;
   profiles: Record<MainPrincipal, PrincipalProfile>;
@@ -49,6 +53,7 @@ export function computeReport(
   period: ReportPeriod,
   options: ReportOptions = {},
   rides?: readonly Ride[],
+  complaints?: readonly PortalComplaint[],
 ): OperationalReport {
   const ctx = buildContext(units, period, options, rides);
   const perspective = (p: Perspective): PerspectiveBlocks => ({
@@ -73,6 +78,7 @@ export function computeReport(
     storage,
     storageDestinations: computeStorageDestinations(ctx),
     outboundCountries: computeOutboundCountries(ctx),
+    complaints: complaints ? computeComplaints(ctx, complaints) : null,
     stock,
     flow: computeFlow(ctx),
     profiles,
@@ -104,13 +110,14 @@ export function computeReportSet(
   comparisons: readonly ComparisonKind[],
   options: ReportOptions = {},
   rides?: readonly Ride[],
+  complaints?: readonly PortalComplaint[],
 ): ReportSet {
   const allRides = rides ?? materializeRides(units).rides;
   return {
-    current: computeReport(units, period, options, allRides),
+    current: computeReport(units, period, options, allRides, complaints),
     comparisons: comparisons.map((kind) => ({
       kind,
-      report: computeReport(units, comparisonPeriod(period, kind), options, allRides),
+      report: computeReport(units, comparisonPeriod(period, kind), options, allRides, complaints),
     })),
   };
 }

@@ -232,6 +232,19 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B114 | Bij één entiteit worden de gegevens zelf gefilterd vóór de berekening: alleen HU's van die entiteit en alleen ritten met HU's van die entiteit (als ritten van die entiteit alleen). Alle slides tonen dan alleen die entiteit, en een HTML-export bevat geen cijfers van de andere principals. Een rit met meerdere principals telt dus voor de gekozen entiteit mee. |
 | B115 | Deck bij één entiteit: voorpagina "Neele-Vat × WIAG review", één volumeslide ("WIAG volume"), geen knoppen maar een vast label met de naam, on time zonder kaarten van andere principals (in plaats daarvan gemeten ritten, te laat, één werkdag te laat of op de losdag). Bestandsnaam van de export bevat de entiteit. |
 
+## Klachten (13 nov)
+
+| # | Besluit |
+|---|---|
+| B116 | Bron: export uit het klachtenportaal (tabblad Klachten), optioneel in dezelfde sleepzone; wordt herkend aan Klachtnr, Datum incident en Onderwerp. Meerdere exports: elk klachtnummer één keer. |
+| B117 | Principal uit Klantnaam AFAS: Adolf Würth GmbH & Co. KG en Würth Logistics Bremen = AWKG, Würth Logistics AG = WIAG, Liqui Moly = Liqui Moly (bevestigd). |
+| B118 | Koppeling aan een rit via het ritnummer (2665…) in HD: Blujay dossier of in het onderwerp: 32 van 42 klachten. Gekoppelde klachten tellen in de periode van de rit, de rest op de incidentdatum. Klachten zonder rit (vooral batterijen en labels, met een Würth-ordernummer) zijn magazijnklachten: ze tellen als klacht maar niet in de percentages per rit of HU (akkoord). |
+| B119 | KPI: ritten zonder klacht en HU's zonder klacht (in en uit samen), doel 95%. Een klacht telt mee tenzij Denied. Getroffen HU's = HD: Pallets (1 als leeg), hoogstens het aantal HU's van de rit. |
+| B120 | Sales = de klant van Würth klaagt (via Neele-Vat beschadigd ontvangen e.d.), Vendor = Würth zelf klaagt (uitleg gebruiker). Op de slide per maand gestapeld; zonder beoordeling = "Not assessed". |
+| B121 | Soort klacht automatisch uit het onderwerp: Damage, Stowing, Missing or not loaded, Dangerous goods and labels, Process and documents, Other (eerste treffer telt). |
+| B122 | Vergelijking met een eerdere periode alleen als de klachtenexport zo ver teruggaat (vanaf de maand van de eerste klacht); anders zou die periode ten onrechte klachtvrij lijken. |
+| B123 | Sectie 03 Quality met twee slides (Complaints, Complaints by type met de laatste klachten), alleen als er een klachtenexport is ingeladen. Bij één entiteit alleen de klachten van die entiteit. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

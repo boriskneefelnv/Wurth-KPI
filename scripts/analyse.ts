@@ -22,6 +22,7 @@ import { comparisonOptionsWithQuality, periodQuality, rideIssues } from "../src/
 import { reconcileRideLists, reconcileVolume } from "../src/core/report/reconcile";
 import { computeReportSet } from "../src/core/report/report";
 import { focusOn } from "../src/core/report/focus";
+import { parseComplaints } from "../src/core/complaints/portal";
 import { MAIN_PRINCIPALS, type MainPrincipal } from "../src/core/types";
 import { volumeSlide, type VolumeSlideSubject } from "../src/core/slides/volume";
 import { mergeWmsExports, parseWmsSheets, WMS_EXPORT_ROW_LIMIT } from "../src/core/wms/excel";
@@ -47,6 +48,8 @@ const { values: args } = parseArgs({
     issues: { type: "string" },
     /** One entity (WIAG, AWKG or "Liqui Moly"): the deck holds only its data. */
     focus: { type: "string" },
+    /** Complaints portal export (optional). */
+    complaints: { type: "string" },
   },
 });
 if (!args.units || !args.laden || !args.lossen) throw new Error("--units, --laden en --lossen zijn verplicht");
@@ -112,7 +115,8 @@ for (const dir of ["inbound", "outbound"] as const) {
 const focus = (args.focus ?? null) as MainPrincipal | null;
 if (focus && !(MAIN_PRINCIPALS as readonly string[]).includes(focus)) throw new Error(`--focus moet WIAG, AWKG of "Liqui Moly" zijn`);
 const data = focus ? focusOn(enriched.units, rides, focus) : { units: enriched.units, rides };
-const set = computeReportSet(data.units, period, comparisons, {}, data.rides);
+const complaints = args.complaints ? parseComplaints(await read(args.complaints)).filter((c) => !focus || c.principal === focus) : undefined;
+const set = computeReportSet(data.units, period, comparisons, {}, data.rides, complaints);
 const subjects: VolumeSlideSubject[] = ["WIAG", "AWKG", "Liqui Moly", "Total"];
 console.log("");
 for (const s of subjects) {
