@@ -33,19 +33,9 @@ export function PunctualitySlide({ model, page, total }: { model: PunctualitySli
           extra={
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
               <span style={{ fontSize: 11, color: T.textSecondary }}>Target {model.target}%</span>
-              {model.meetsTarget !== null && (
-                <span
-                  style={{
-                    padding: "3px 9px",
-                    borderRadius: 10,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    background: model.meetsTarget ? "#E8F4E1" : "#FBEFE4",
-                    color: model.meetsTarget ? "#3D7F1F" : BELOW,
-                  }}
-                >
-                  {model.meetsTarget ? "Achieved" : "Below target"}
-                </span>
+              {/* Only the good news gets a label; below target shows in the colour of the figure. */}
+              {model.meetsTarget === true && (
+                <span style={{ padding: "3px 9px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "#E8F4E1", color: "#3D7F1F" }}>Achieved</span>
               )}
               {!focus && model.secondary && model.secondary.pct !== null && (
                 <span style={{ fontSize: 11, color: T.textSecondary, whiteSpace: "nowrap" }}>

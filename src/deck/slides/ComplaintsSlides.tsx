@@ -92,8 +92,9 @@ function PctCard({ index, label, level, target, unit, deltaLabel }: { index: num
       </div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
         <span style={{ fontSize: 11, color: T.textSecondary }}>Target {target}%</span>
-        {level.pct !== null && (
-          <span style={{ padding: "3px 9px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: below ? "#FBEFE4" : "#E8F4E1", color: below ? BELOW : "#3D7F1F" }}>{below ? "Below target" : "Achieved"}</span>
+        {/* Only the good news gets a label; below target shows in the colour of the figure. */}
+        {level.pct !== null && !below && (
+          <span style={{ padding: "3px 9px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "#E8F4E1", color: "#3D7F1F" }}>Achieved</span>
         )}
       </div>
     </Shell>
