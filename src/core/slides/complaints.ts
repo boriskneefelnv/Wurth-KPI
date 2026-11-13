@@ -27,7 +27,8 @@ export interface ComplaintsView {
   palletsAffected: number;
   /** Per bucket, counted complaints by origin, and the share of rides without complaint. */
   buckets: { key: string; label: string; sales: number; vendor: number; unassessed: number; ridesPct: number | null }[];
-  categories: { category: ComplaintCategory; accepted: number; open: number; denied: number; total: number }[];
+  /** Per type, most complaints first. `counted` and `pallets` exclude denied complaints. */
+  categories: { category: ComplaintCategory; accepted: number; open: number; denied: number; total: number; counted: number; pallets: number }[];
   /** Newest first. */
   latest: ComplaintItem[];
 }
@@ -88,8 +89,12 @@ export function complaintsSlide(set: ReportSet): ComplaintsSlideModel | null {
             open: xs.filter((i) => i.verdict === "open").length,
             denied: xs.filter((i) => i.verdict === "denied").length,
             total: xs.length,
+            counted: xs.filter((i) => i.counted).length,
+            pallets: xs.filter((i) => i.counted).reduce((a, i) => a + (i.pallets && i.pallets > 0 ? i.pallets : 1), 0),
           };
-        }).filter((c) => c.total > 0),
+        })
+          .filter((c) => c.total > 0)
+          .sort((a, b) => b.counted - a.counted || b.pallets - a.pallets),
         latest: [...items].sort((a, b) => b.day.localeCompare(a.day) || b.klachtnr - a.klachtnr),
       };
       return [key, view];

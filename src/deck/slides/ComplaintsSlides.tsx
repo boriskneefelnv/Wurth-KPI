@@ -48,7 +48,7 @@ export function ComplaintsByTypeSlide({ model, page, total }: { model: Complaint
   const { view, toggle } = useView(model);
   return (
     <SlideShell title="Complaints by type" topBar={toggle} page={page} total={total}>
-      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1fr 1.15fr", gap: 14 }}>
+      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1.25fr 1fr", gap: 14 }}>
         <ByType view={view} />
         <Latest view={view} />
       </div>
@@ -150,8 +150,8 @@ function PerMonth({ model, view }: { model: ComplaintsSlideModel; view: Complain
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
         <div style={{ fontSize: 12, color: T.textSecondary }}>{per} · complaints that count, rides without complaint below</div>
         <div style={{ display: "flex", gap: 16, fontSize: 11, fontWeight: 500, color: T.heroText }}>
-          <Legend color={ORIGIN.sales} label="Sales (Würth's customer)" />
-          <Legend color={ORIGIN.vendor} label="Vendor (Würth)" />
+          <Legend color={ORIGIN.sales} label="Sales" />
+          <Legend color={ORIGIN.vendor} label="Vendor" />
           <Legend color={ORIGIN.unassessed} label="Not assessed" />
         </div>
       </div>
@@ -234,47 +234,89 @@ const CATEGORY_LABEL: Record<ComplaintCategory, string> = {
   Other: "Other",
 };
 
+/** One colour per type (as in the Neele-Vat complaint slides). */
+const TYPE_COLOR: Record<ComplaintCategory, string> = {
+  Damage: "#1C5A7D",
+  Stowing: "#E08A1E",
+  "Missing or not loaded": "#3E9BC9",
+  "Dangerous goods and labels": "#5BA04A",
+  "Process and documents": "#A0632E",
+  Other: "#8E5BA6",
+};
+
 function ByType({ view }: { view: ComplaintsView }) {
   const animate = useAnimate();
-  const max = Math.max(1, ...view.categories.map((c) => c.total));
-  const pct = (v: number) => `${(v / max) * 100}%`;
-  const glide = `width ${ANIM.switch}ms ease-out, left ${ANIM.switch}ms ease-out`;
+  const [hover, setHover] = useState<ComplaintCategory | null>(null);
+  const cats = view.categories.filter((c) => c.counted > 0);
+  const total = cats.reduce((a, c) => a + c.counted, 0);
+  const pallets = cats.reduce((a, c) => a + c.pallets, 0);
+  const n = useTweenNumber(total, ANIM.count, 0);
+  const R = 88;
+  const SW = 34;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
   return (
-    <div style={{ background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "14px 20px", display: "flex", flexDirection: "column", minHeight: 0 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: T.textSecondary }}>All complaints by type</div>
-        <div style={{ display: "flex", gap: 12, fontSize: 11, fontWeight: 500, color: T.heroText }}>
-          <Legend color={VERDICT.accepted} label="Accepted" />
-          <Legend color={VERDICT.open} label="Not assessed" />
-          <Legend color={VERDICT.denied} label="Denied" />
-        </div>
-      </div>
-      {view.categories.length === 0 && <div style={{ fontSize: 13, color: T.textSecondary }}>No complaints in this period.</div>}
-      {view.categories.map((c, i) => {
-        let left = 0;
-        const parts: [keyof typeof VERDICT, number][] = [
-          ["accepted", c.accepted],
-          ["open", c.open],
-          ["denied", c.denied],
-        ];
-        return (
-          <div key={c.category} style={{ marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: T.heroText, marginBottom: 5 }}>
-              <span style={{ fontWeight: 500 }}>{CATEGORY_LABEL[c.category]}</span>
-              <strong style={{ fontVariantNumeric: "tabular-nums" }}>{c.total}</strong>
-            </div>
-            <div style={{ position: "relative", height: 16, background: "#F3F6F9", borderRadius: 2 }}>
-              <div style={{ position: "absolute", inset: 0, transformOrigin: "left", ...(animate ? { transform: "scaleX(0)", animation: `deckGrowX ${ANIM.barGrow}ms ${i * ANIM.barStagger}ms ease-out forwards` } : {}) }}>
-                {parts.map(([k, v]) => {
-                  const l = left;
-                  left += v;
-                  return v > 0 ? <div key={k} title={`${k}: ${v}`} style={{ position: "absolute", top: 0, bottom: 0, left: pct(l), width: pct(v), background: VERDICT[k], borderRight: "1px solid #fff", transition: glide }} /> : null;
-                })}
-              </div>
+    <div style={{ background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "16px 22px", display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 6 }}>Complaints that count, by type</div>
+      {total === 0 ? (
+        <div style={{ fontSize: 13, color: T.textSecondary }}>No complaints in this period.</div>
+      ) : (
+        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "240px 1fr", gap: 16, alignItems: "center" }}>
+          <div style={{ position: "relative", width: 240, height: 240 }}>
+            <svg width={240} height={240} viewBox="0 0 240 240" style={{ transform: "rotate(-90deg)" }}>
+              {cats.map((c, i) => {
+                const len = (c.counted / total) * C;
+                const off = acc;
+                acc += len;
+                const dim = hover !== null && hover !== c.category;
+                return (
+                  <circle
+                    key={c.category}
+                    cx={120}
+                    cy={120}
+                    r={R}
+                    fill="none"
+                    stroke={TYPE_COLOR[c.category]}
+                    strokeWidth={hover === c.category ? SW + 6 : SW}
+                    strokeDasharray={`${Math.max(0, len - 1.5)} ${C}`}
+                    strokeDashoffset={-off}
+                    opacity={dim ? 0.35 : 1}
+                    style={{ transition: `stroke-dasharray ${ANIM.switch}ms ease-out, stroke-dashoffset ${ANIM.switch}ms ease-out, opacity 150ms, stroke-width 150ms`, ...entry(animate, "deckFadeIn", 300, 150 + i * 90) }}
+                    onMouseEnter={() => setHover(c.category)}
+                    onMouseLeave={() => setHover(null)}
+                  />
+                );
+              })}
+            </svg>
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <div style={{ fontSize: 46, fontWeight: 700, color: T.heroText, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{fmtInt(n)}</div>
+              <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 4 }}>complaints</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.bluePrimary, marginTop: 2 }}>{fmtInt(pallets)} pallets</div>
             </div>
           </div>
-        );
-      })}
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: "16px 1fr 78px 52px", columnGap: 8, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: T.textSecondary, paddingBottom: 6, borderBottom: `1px solid #EEF2F6` }}>
+              <span />
+              <span>Type</span>
+              <span style={{ textAlign: "right" }}>Complaints</span>
+              <span style={{ textAlign: "right" }}>Pallets</span>
+            </div>
+            {cats.map((c, i) => (
+              <div
+                key={c.category}
+                onMouseEnter={() => setHover(c.category)}
+                onMouseLeave={() => setHover(null)}
+                style={{ display: "grid", gridTemplateColumns: "16px 1fr 78px 52px", columnGap: 8, alignItems: "center", height: 36, fontSize: 12.5, color: T.heroText, opacity: hover !== null && hover !== c.category ? 0.45 : 1, transition: "opacity 150ms", ...entry(animate, "deckFadeIn", 220, 250 + i * 70) }}
+              >
+                <span style={{ width: 16, height: 16, borderRadius: 3, background: TYPE_COLOR[c.category] }} />
+                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.category}</span>
+                <strong style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{c.counted}</strong>
+                <strong style={{ textAlign: "right", color: T.bluePrimary, fontVariantNumeric: "tabular-nums" }}>{fmtInt(c.pallets)}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -284,7 +326,7 @@ const VERDICT_LABEL = { accepted: "Accepted", open: "Not assessed", denied: "Den
 function Latest({ view }: { view: ComplaintsView }) {
   const animate = useAnimate();
   const rows = view.latest.slice(0, 11);
-  const cols = "62px 70px 1fr 92px";
+  const cols = "46px 74px 1fr 92px";
   return (
     <div style={{ background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "14px 20px", display: "flex", flexDirection: "column", minHeight: 0 }}>
       <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 8 }}>
