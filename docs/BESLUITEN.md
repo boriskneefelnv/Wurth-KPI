@@ -209,6 +209,14 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B106 | Nieuwe rapportsoort "Jaar tot nu toe" (ytd): 1 januari tot en met de laatste gekozen maand, staven per maand, label "Jan to Sep 2026". Aangeboden voor elke maand vanaf februari die de data dekt. |
 | B107 | Year to date vergelijkt alleen met dezelfde maanden vorig jaar (Jan to Sep 2025); "vorige periode" heeft hier geen betekenis. Een weergave van januari tot een maand die geen kwartaal- of halfjaareinde is, kiest standaard deze soort. |
 
+## Voorraad (13 nov)
+
+| # | Besluit |
+|---|---|
+| B108 | Voorraad = HU's op voorraad aan het eind van elke dag (ingeslagen op of voor die dag, nog niet uitgeslagen), gemiddeld per maand (op verzoek: gemiddelde per maand, niet de stand aan het eind). |
+| B109 | Gecontroleerd op de data: HU's zonder uitslag zijn vrijwel allemaal recent ingeslagen (okt/nov 2026), er is geen "spookvoorraad" van oude HU's. Voorraad hangt af van eerdere inslag, dus het unitoverzicht moet de marge van 4 maanden vóór de periode hebben (al zo ingericht). |
+| B110 | Slide "Stock" in sectie 02: gemiddelde voorraad (verschil met vorig jaar, neutrale kleur), voorraad aan het eind van de periode, hoogste stand, en voorraad in werkdagen (gemiddelde voorraad / uitgaande HU's per werkdag). Bij alle principals gestapeld per principal; knoppen per principal; vorig jaar als streep (alleen voor maanden met voorraad). |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

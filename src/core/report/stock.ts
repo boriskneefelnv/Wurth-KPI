@@ -1,6 +1,7 @@
-import { addDays, dayToDate } from "../period";
-import type { DayKey, Principal, WmsUnit } from "../types";
-import { PRINCIPALS } from "../types";
+import { dayKey } from "../dates";
+import { addDays, bucketIndex, dayToDate, eachDay } from "../period";
+import type { DayKey, MainPrincipal, Principal, WmsUnit } from "../types";
+import { MAIN_PRINCIPALS, PRINCIPALS } from "../types";
 import type { ReportContext } from "./context";
 
 export interface StockSnapshot {
@@ -20,6 +21,21 @@ export interface StockBlock {
   endOfPeriod: StockSnapshot;
   /** Absolute HU change over the period (end − start). Null when the data does not reach back to the start. */
   delta: { total: number; perPrincipal: Record<Principal, number> } | null;
+  /** Average stock (HUs at the end of each day), in total and per main principal. */
+  average: Record<StockKey, StockAverage>;
+}
+
+export type StockKey = MainPrincipal | "Total";
+
+export interface StockAverage {
+  /** Mean of the end-of-day stock over all days of the period. */
+  avg: number;
+  /** Mean per bucket (month, week or day) of the period. */
+  perBucket: { key: string; label: string; avg: number }[];
+  /** Highest end-of-day stock in the period (first day on ties). */
+  peak: { day: DayKey; hus: number } | null;
+  /** Stock at the end of the period. */
+  end: number;
 }
 
 /** In stock at `at` ⇔ inbound ≤ at and (no outbound or outbound > at). */
@@ -55,6 +71,7 @@ export function computeStock(ctx: ReportContext): StockBlock {
   const startAt = endOfDay(startDay);
   const hasHistory = ctx.units.some((u) => u.inslagUnit !== null && u.inslagUnit <= startAt);
   return {
+    average: averageStock(ctx),
     snapshots,
     startOfPeriod,
     endOfPeriod,
@@ -67,4 +84,52 @@ export function computeStock(ctx: ReportContext): StockBlock {
         }
       : null,
   };
+}
+
+/**
+ * End-of-day stock for every day of the period, averaged per bucket. A HU is
+ * in stock at the end of day d when it came in on or before d and left after
+ * d (or has not left). Done as one sweep over the units.
+ */
+export function averageStock(ctx: ReportContext): Record<StockKey, StockAverage> {
+  const days = eachDay(ctx.period);
+  const first = days[0]!;
+  const last = days[days.length - 1]!;
+  const keys: StockKey[] = [...MAIN_PRINCIPALS, "Total"];
+  const start = Object.fromEntries(keys.map((k) => [k, 0])) as Record<StockKey, number>;
+  const diff = Object.fromEntries(keys.map((k) => [k, days.map(() => 0)])) as Record<StockKey, number[]>;
+  const index = new Map(days.map((d, i) => [d, i]));
+  const isMain = (p: string): p is MainPrincipal => (MAIN_PRINCIPALS as readonly string[]).includes(p);
+
+  for (const u of ctx.units) {
+    if (!u.inslagUnit) continue;
+    const inDay = dayKey(u.inslagUnit);
+    const outDay = u.uitslagUnit ? dayKey(u.uitslagUnit) : null;
+    if (inDay > last || (outDay !== null && outDay <= inDay)) continue;
+    if (outDay !== null && outDay < first) continue;
+    const ks: StockKey[] = isMain(u.principal) ? ["Total", u.principal] : ["Total"];
+    // +1 from the end of the inbound day, -1 from the end of the outbound day.
+    for (const k of ks) {
+      if (inDay < first) start[k]++;
+      else diff[k][index.get(inDay)!]!++;
+      if (outDay !== null && outDay <= last) diff[k][index.get(outDay)!]!--;
+    }
+  }
+
+  return Object.fromEntries(
+    keys.map((k) => {
+      let level = start[k];
+      const series = days.map((_, i) => (level += diff[k][i]!));
+      let peak: StockAverage["peak"] = null;
+      series.forEach((v, i) => {
+        if (!peak || v > peak.hus) peak = { day: days[i]!, hus: v };
+      });
+      const perBucket = ctx.buckets.map((b) => {
+        const xs = series.filter((_, i) => bucketIndex([b], days[i]!) === 0);
+        return { key: b.key, label: b.label, avg: xs.length ? xs.reduce((a, x) => a + x, 0) / xs.length : 0 };
+      });
+      const avg: StockAverage = { avg: series.reduce((a, x) => a + x, 0) / series.length, perBucket, peak, end: series[series.length - 1]! };
+      return [k, avg];
+    }),
+  ) as Record<StockKey, StockAverage>;
 }

@@ -232,6 +232,16 @@ describe("stock", () => {
     expect(s.delta!.total).toBe(0);
   });
 
+  it("averages the end-of-day stock per month and per principal", () => {
+    const s = computeStock(ctx(units, ["2026-02", "2026-03"]));
+    // Feb: 1 all month + 1 from the 10th (19 of 28 days); Mar: 2 until the 30th, the leaving one is gone at the end of the 31st, the AWKG one arrives that day.
+    expect(s.average.Total.perBucket[0]!.avg).toBeCloseTo(1 + 19 / 28);
+    expect(s.average.Total.perBucket[1]!.avg).toBeCloseTo(2);
+    expect(s.average.AWKG.perBucket[1]!.avg).toBeCloseTo(1 / 31);
+    expect(s.average.Total.end).toBe(2);
+    expect(s.average.Total.peak).toEqual({ day: "2026-02-10", hus: 2 });
+  });
+
   it("no delta when the data does not reach back to the start", () => {
     expect(computeStock(ctx([unit({ inslag: "2026-04-02" })], ["2026-04"])).delta).toBeNull();
   });

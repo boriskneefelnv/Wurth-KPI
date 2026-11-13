@@ -3,10 +3,12 @@ import type { ReportSet } from "../core/report/report";
 import { dailySlide } from "../core/slides/daily";
 import { punctualitySlide } from "../core/slides/punctuality";
 import { destinationsSlide } from "../core/slides/destinations";
+import { stockSlide } from "../core/slides/stock";
 import { storageSlide } from "../core/slides/storage";
 import { worldMapSlide } from "../core/slides/worldMap";
 import { volumeSlide, type VolumeSlideSubject } from "../core/slides/volume";
 import { PunctualitySlide } from "./slides/PunctualitySlide";
+import { StockSlide } from "./slides/StockSlide";
 import { StorageSlide } from "./slides/StorageSlide";
 import { DestinationsSlide } from "./slides/DestinationsSlide";
 import { WorldMapSlide } from "./slides/WorldMapSlide";
@@ -94,7 +96,12 @@ export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
     {
       id: "divider-storage",
       title: "Section 02 Storage",
-      render: (page, total) => <DividerSlide number="02" title="Storage" subtitle="How long goods stay in the warehouse." footer={footer} page={page} total={total} />,
+      render: (page, total) => <DividerSlide number="02" title="Storage" subtitle="Stock and how long goods stay in the warehouse." footer={footer} page={page} total={total} />,
+    },
+    {
+      id: "stock",
+      title: "Stock",
+      render: (page: number, total: number) => <StockSlide model={stockSlide(set)} page={page} total={total} />,
     },
     {
       id: "storage-duration",
