@@ -174,6 +174,16 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B91 | Knoppen op de slide (All principals, WIAG, AWKG, Liqui Moly) wisselen kaarten, staven, lijn en tekst; cijfers en staven glijden naar de nieuwe waarden. Werkt ook in de HTML-export; een klik op een knop bladert niet. Print en miniaturen tonen All principals. |
 | B92 | Groei door een principal zonder volume in de vergelijkingsperiode wordt in de tekst benoemd (H1 2026: AWKG was in H1 2025 nog niet actief, vandaar +90%). |
 
+## Opslagduur (13 nov)
+
+| # | Besluit |
+|---|---|
+| B93 | "Dagen in opslag" uit het unitoverzicht is leidend; in de data is het steeds uitslag min inslag plus 1 (22.959 van 22.969 HU's in H1 2026). |
+| B94 | Populatie: HU's die in de periode vertrokken (op de dag van hun uitgaande rit, als bij volume) en een opslagduur hebben. |
+| B95 | Slide "Storage duration" in sectie 02: gemiddelde en mediaan (verschil in dagen ten opzichte van vorig jaar), aantal gemeten HU's, aandeel boven 60 dagen; verdeling over Up to 7, 8 to 14, 15 to 30, 31 to 60 en Over 60 days met vorig jaar als markering; gemiddelde en mediaan per maand. Knoppen per principal zoals bij werkdruk. |
+| B96 | Langere of kortere opslag is geen goed of slecht: het verschil krijgt een neutrale kleur. Een principal die in de vergelijkingsperiode nog niet actief was, wordt in de tekst genoemd (H1 2026: AWKG, gemiddeld 30,7 dagen). |
+| B97 | Knoppen per principal staan op alle slides met knoppen boven de kaarten, omdat kaarten en grafieken allebei meewisselen. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

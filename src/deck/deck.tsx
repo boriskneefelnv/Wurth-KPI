@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import type { ReportSet } from "../core/report/report";
 import { dailySlide } from "../core/slides/daily";
 import { punctualitySlide } from "../core/slides/punctuality";
+import { storageSlide } from "../core/slides/storage";
 import { volumeSlide, type VolumeSlideSubject } from "../core/slides/volume";
 import { PunctualitySlide } from "./slides/PunctualitySlide";
+import { StorageSlide } from "./slides/StorageSlide";
 import { ClosingSlide } from "./slides/ClosingSlide";
 import { DailySlide } from "./slides/DailySlide";
 import { CoverSlide } from "./slides/CoverSlide";
@@ -78,6 +80,16 @@ export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
       id: "inbound-stocked",
       title: "Inbound stocked on time",
       render: (page: number, total: number) => <PunctualitySlide model={punctualitySlide(set, "stocking")} page={page} total={total} />,
+    },
+    {
+      id: "divider-storage",
+      title: "Section 02 Storage",
+      render: (page, total) => <DividerSlide number="02" title="Storage" subtitle="How long goods stay in the warehouse." footer={footer} page={page} total={total} />,
+    },
+    {
+      id: "storage-duration",
+      title: "Storage duration",
+      render: (page: number, total: number) => <StorageSlide model={storageSlide(set)} page={page} total={total} />,
     },
     { id: "closing", title: "Closing", render: () => <ClosingSlide footer={`Würth · ${p.label}`} /> },
   ];

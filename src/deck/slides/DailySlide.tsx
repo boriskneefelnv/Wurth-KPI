@@ -3,6 +3,7 @@ import type { DailyKey } from "../../core/report/daily";
 import { fmtDec, fmtInt, plural } from "../../core/slides/format";
 import type { DailySlideModel, DailyView } from "../../core/slides/daily";
 import { ANIM, entry, useAnimate, useTweenNumber } from "../anim";
+import { PrincipalToggle } from "../PrincipalToggle";
 import { SlideShell } from "../SlideShell";
 import { FONT, T } from "../tokens";
 
@@ -18,6 +19,10 @@ export function DailySlide({ model, page, total }: { model: DailySlideModel; pag
   const view = model.views[key];
   return (
     <SlideShell title={model.title} subtitle={view.headline} page={page} total={total}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <PrincipalToggle options={model.order.map((k) => ({ key: k, label: model.views[k].label }))} selected={key} onSelect={setKey} />
+        <span style={{ fontSize: 11, color: T.textSecondary }}>HUs in and out per day in {model.period.label}, on the day of their ride</span>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
         <Card index={0} label="HUs per workday" value={view.avgPerWorkday?.total ?? null} sub={`${fmtInt(view.inbound.reduce((a, b) => a + b, 0) + view.outbound.reduce((a, b) => a + b, 0))} HUs in total`} delta={view.avgDeltaPct} deltaLabel={model.comparisonLabel} />
         <Card index={1} label="Inbound per workday" value={view.avgPerWorkday?.inbound ?? null} sub={perRide(view.inbound, view.inboundRides)} swatch={T.inbound} />
@@ -30,7 +35,7 @@ export function DailySlide({ model, page, total }: { model: DailySlideModel; pag
           note={view.peakRatio !== null ? `${fmtDec(view.peakRatio)}× an average workday` : null}
         />
       </div>
-      <Chart model={model} view={view} selected={key} onSelect={setKey} />
+      <Chart model={model} view={view} />
     </SlideShell>
   );
 }
@@ -108,52 +113,13 @@ function niceMax(raw: number): { max: number; ticks: number[] } {
   return { max, ticks: [0, max / 4, max / 2, (max * 3) / 4, max] };
 }
 
-function Toggle({ model, selected, onSelect }: { model: DailySlideModel; selected: DailyKey; onSelect: (k: DailyKey) => void }) {
-  return (
-    <div
-      style={{ display: "inline-flex", background: "#EDF3F8", borderRadius: 6, padding: 3, gap: 2 }}
-      // Clicks here choose a view; they must not turn the slide.
-      onClick={(e) => e.stopPropagation()}
-    >
-      {model.order.map((k) => {
-        const on = k === selected;
-        return (
-          <button
-            key={k}
-            type="button"
-            onClick={(e) => {
-              onSelect(k);
-              e.currentTarget.blur(); // Space and Enter keep turning slides
-            }}
-            style={{
-              border: 0,
-              borderRadius: 4,
-              padding: "5px 12px",
-              fontFamily: FONT,
-              fontSize: 11.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              outline: "none",
-              background: on ? T.heroText : "transparent",
-              color: on ? "#fff" : T.inbound,
-              transition: "background 200ms, color 200ms",
-            }}
-          >
-            {model.views[k].label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function Chart({ model, view, selected, onSelect }: { model: DailySlideModel; view: DailyView; selected: DailyKey; onSelect: (k: DailyKey) => void }) {
+function Chart({ model, view }: { model: DailySlideModel; view: DailyView }) {
   const animate = useAnimate();
   const [hover, setHover] = useState<number | null>(null);
   const n = model.days.length;
   const totals = view.inbound.map((v, i) => v + view.outbound[i]!);
   const { max, ticks } = niceMax(Math.max(0, ...totals));
-  const PLOT_H = 300;
+  const PLOT_H = 262;
   const Y_W = 48;
   const PLOT_W = 1184 - 40 - Y_W; // card width minus padding and axis
   const slot = PLOT_W / Math.max(1, n);
@@ -166,8 +132,8 @@ function Chart({ model, view, selected, onSelect }: { model: DailySlideModel; vi
 
   return (
     <div style={{ flex: 1, minHeight: 0, background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "12px 20px 10px", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <Toggle model={model} selected={selected} onSelect={onSelect} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: T.textSecondary }}>{n <= 7 ? "Per day" : "Per workday"} · HUs inbound and outbound</div>
         <div style={{ display: "flex", gap: 16, fontSize: 11, fontWeight: 500, color: T.heroText }}>
           <Legend swatch={<span style={{ width: 11, height: 11, borderRadius: 2, background: T.inbound }} />} label="Inbound" />
           <Legend swatch={<span style={{ width: 11, height: 11, borderRadius: 2, background: T.outbound }} />} label="Outbound" />

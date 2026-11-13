@@ -1,6 +1,7 @@
 import { STORAGE_TOP } from "../constants";
 import type { Principal, StorageBucket, WmsUnit } from "../types";
 import { PRINCIPALS, STORAGE_BUCKETS } from "../types";
+import { bucketIndex } from "../period";
 import { mean, median, type ReportContext } from "./context";
 
 export interface StorageStats {
@@ -8,6 +9,8 @@ export interface StorageStats {
   avgDays: number | null;
   medianDays: number | null;
   buckets: Record<StorageBucket, number>;
+  /** Per trend bucket of the period (by the day the HU left, as in volume). */
+  perBucket: { key: string; label: string; count: number; avgDays: number | null; medianDays: number | null }[];
 }
 
 export interface StorageBlock {
@@ -15,11 +18,22 @@ export interface StorageBlock {
   perPrincipal: Record<Principal, StorageStats>;
 }
 
-function stats(units: readonly WmsUnit[]): StorageStats {
+function stats(ctx: ReportContext, units: readonly WmsUnit[]): StorageStats {
   const days = units.map((u) => u.dagenInOpslag!);
   const buckets = Object.fromEntries(STORAGE_BUCKETS.map((b) => [b, 0])) as Record<StorageBucket, number>;
   for (const u of units) buckets[u.storageBucket!]++;
-  return { count: units.length, avgDays: mean(days), medianDays: median(days), buckets };
+  const per = ctx.buckets.map(() => [] as number[]);
+  for (const u of units) {
+    const i = bucketIndex(ctx.buckets, ctx.unitDay(u, "outbound")!);
+    if (i !== -1) per[i]!.push(u.dagenInOpslag!);
+  }
+  return {
+    count: units.length,
+    avgDays: mean(days),
+    medianDays: median(days),
+    buckets,
+    perBucket: per.map((xs, i) => ({ key: ctx.buckets[i]!.key, label: ctx.buckets[i]!.label, count: xs.length, avgDays: mean(xs), medianDays: median(xs) })),
+  };
 }
 
 /** HUs that left the warehouse in the period and have a storage duration. */
@@ -32,8 +46,8 @@ export function storagePopulation(ctx: ReportContext): WmsUnit[] {
 export function computeStorage(ctx: ReportContext): StorageBlock {
   const pop = storagePopulation(ctx);
   return {
-    total: stats(pop),
-    perPrincipal: Object.fromEntries(PRINCIPALS.map((p) => [p, stats(pop.filter((u) => u.principal === p))])) as Record<
+    total: stats(ctx, pop),
+    perPrincipal: Object.fromEntries(PRINCIPALS.map((p) => [p, stats(ctx, pop.filter((u) => u.principal === p))])) as Record<
       Principal,
       StorageStats
     >,
