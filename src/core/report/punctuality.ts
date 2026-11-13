@@ -14,6 +14,10 @@ export interface PunctualityCounts {
 
 export interface PunctualityResult extends PunctualityCounts {
   target: number;
+  /** Workdays after the planned day that still count as on time (0 = on the day). */
+  graceWorkdays: number;
+  /** Rides done on or before the planned day itself. */
+  onPlannedDay: PunctualityCounts;
   meetsTarget: boolean | null;
   /** Rides in scope that lack the dates to be measured. */
   notMeasurable: number;
@@ -30,7 +34,7 @@ export interface PunctualityResult extends PunctualityCounts {
   exceptions: { ritNummer: string; principal: Principal; period: Period; actual: DayKey; planned: DayKey; workdaysLate: number }[];
 }
 
-type Outcome = { ok: boolean; actual: DayKey; planned: DayKey } | null;
+type Outcome = { actual: DayKey; planned: DayKey } | null;
 
 /** Workdays from `planned` to `actual` (0 when on or before the planned day). */
 export function workdaysLate(planned: DayKey, actual: DayKey, holidays: ReadonlySet<DayKey>): number {
@@ -44,11 +48,13 @@ function aggregate(
   ctx: ReportContext,
   direction: "inbound" | "outbound",
   target: number,
+  graceWorkdays: number,
   judge: (ride: Ride) => Outcome,
 ): PunctualityResult {
   const zero = (): PunctualityCounts => ({ ok: 0, notOk: 0, pct: null });
   const total = zero();
   const within = zero();
+  const onDay = zero();
   const perPrincipal = Object.fromEntries(MAIN_PRINCIPALS.map((p) => [p, zero()])) as Record<MainPrincipal, PunctualityCounts>;
   const perBucket = ctx.buckets.map(zero);
   const perBucketPerPrincipal = Object.fromEntries(MAIN_PRINCIPALS.map((p) => [p, ctx.buckets.map(zero)])) as Record<MainPrincipal, PunctualityCounts[]>;
@@ -63,6 +69,8 @@ function aggregate(
       continue;
     }
     const principal = dominantPrincipal(ride);
+    const late = workdaysLate(outcome.planned, outcome.actual, ctx.holidays);
+    const ok = late <= graceWorkdays;
     const buckets = [total];
     const bi = bucketIndex(ctx.buckets, ride.canonicalDate);
     if (bi !== -1) buckets.push(perBucket[bi]!);
@@ -70,10 +78,10 @@ function aggregate(
       buckets.push(perPrincipal[principal as MainPrincipal]);
       if (bi !== -1) buckets.push(perBucketPerPrincipal[principal as MainPrincipal][bi]!);
     }
-    for (const b of buckets) outcome.ok ? b.ok++ : b.notOk++;
-    const late = workdaysLate(outcome.planned, outcome.actual, ctx.holidays);
+    for (const b of buckets) ok ? b.ok++ : b.notOk++;
     late <= 1 ? within.ok++ : within.notOk++;
-    if (!outcome.ok) {
+    late === 0 ? onDay.ok++ : onDay.notOk++;
+    if (!ok) {
       lateByWorkdays[late] = (lateByWorkdays[late] ?? 0) + 1;
       exceptions.push({ ritNummer: ride.ritNummer, principal, period: ride.period, actual: outcome.actual, planned: outcome.planned, workdaysLate: late });
     }
@@ -84,6 +92,7 @@ function aggregate(
   };
   finish(total);
   finish(within);
+  finish(onDay);
   Object.values(perPrincipal).forEach(finish);
   perBucket.forEach(finish);
   Object.values(perBucketPerPrincipal).forEach((xs) => xs.forEach(finish));
@@ -91,6 +100,8 @@ function aggregate(
   return {
     ...total,
     target,
+    graceWorkdays,
+    onPlannedDay: onDay,
     meetsTarget: total.pct === null ? null : total.ok / (total.ok + total.notOk) >= target / 100,
     notMeasurable,
     perPrincipal,
@@ -131,29 +142,30 @@ const maxDay = (dates: (Date | null)[]): DayKey | null => {
  */
 export function computeOnTimeLoading(ctx: ReportContext): PunctualityResult {
   const rule = ctx.options.onTimeRule;
-  return aggregate(ctx, "outbound", TARGETS.onTimeLoadingPct, (ride) => {
+  return aggregate(ctx, "outbound", TARGETS.onTimeLoadingPct, 0, (ride) => {
     const units = ctx.unitsByRide.outbound.get(ride.ritNummer) ?? [];
     const planned = ride.dateResolution === "planned" ? ride.canonicalDate : minDay(units.map((u) => u.vertrek));
     const outs = units.map((u) => u.uitslagUnit);
     const actual = rule === "latest" ? maxDay(outs) : minDay(outs);
     if (!planned || !actual) return null;
-    return { ok: actual <= planned, actual, planned };
+    return { actual, planned };
   });
 }
 
 /**
  * Inbound stocked on time per inbound ride: every pallet of the ride scanned
- * in (Inslag Unit) on or before the Verwachte datum from Te lossen. Rides
+ * in (Inslag Unit) at the latest one workday after the Verwachte datum from
+ * Te lossen (agreed with the user; `onPlannedDay` keeps the same-day share). Rides
  * without a ride list date are not measurable (the unit file has no reliable
  * warehouse unloading date).
  */
 export function computeInboundStocked(ctx: ReportContext): PunctualityResult {
-  return aggregate(ctx, "inbound", TARGETS.inboundStockedPct, (ride) => {
+  return aggregate(ctx, "inbound", TARGETS.inboundStockedPct, TARGETS.inboundStockedGraceWorkdays, (ride) => {
     if (ride.dateResolution !== "planned") return null;
     const units = ctx.unitsByRide.inbound.get(ride.ritNummer) ?? [];
     const scanned = units.filter((u) => u.inslagUnit);
     if (!scanned.length) return null;
     const latestIn = maxDay(scanned.map((u) => u.inslagUnit));
-    return { ok: latestIn! <= ride.canonicalDate, actual: latestIn!, planned: ride.canonicalDate };
+    return { actual: latestIn!, planned: ride.canonicalDate };
   });
 }

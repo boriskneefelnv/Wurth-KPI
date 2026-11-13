@@ -160,6 +160,9 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B82 | De afspraak is de verwachte datum (besloten). Let op: "Gewijzigd" staat bij 3.244 van 3.265 laadritten op Y; als die datum achteraf naar de echte laaddag wordt gezet, valt het percentage gunstiger uit. |
 | B83 | Inbound stocked on time (aparte slide): een inkomende rit is op tijd als alle pallets uiterlijk op de verwachte losdag (Te lossen) zijn ingeslagen. Tweede cijfer: binnen één werkdag. Zonder rittenlijst niet meetbaar (de Losdatum in het unitoverzicht is geen magazijndatum). Doel voorlopig 95%. |
 | B84 | Opzet (rustig): groot percentage met doel en status, vergelijking in procentpunten, principals als kleine cijfers, één grafiek per maand met doellijn; staven onder het doel in oranje; vergelijkingsperiode als markering. Te late ritten samengevat in werkdagen. |
+| B85 | Herzien op verzoek (13 nov): kaarten voor alle principals samen en WIAG, AWKG en Liqui Moly (met verschil in punten), daaronder per maand drie staven per principal met de doellijn en het maandtotaal. |
+| B86 | Inbound stocked on time: doel is nu **95% binnen één werkdag** na de verwachte losdag (besloten door gebruiker). Het aandeel op de losdag zelf staat als tweede cijfer op de slide (`onPlannedDay`). Instelbaar via `TARGETS.inboundStockedGraceWorkdays`. |
+| B87 | Presentatie: geen onzichtbare klikvlakken meer over de slide (die gaven een focuslijn en blokkeerden de hover op de eerste maand). Een klik op de slide bladert: linkerkwart terug, de rest vooruit. |
 
 ## Open vragen
 

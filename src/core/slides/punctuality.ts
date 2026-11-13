@@ -24,7 +24,7 @@ export interface PunctualitySlideModel {
   meetsTarget: boolean | null;
   ok: number;
   measured: number;
-  /** Stocking: share stocked within one workday after unloading. */
+  /** Stocking: share stocked on the unloading day itself (the target allows one workday). */
   secondary: { label: string; pct: number | null } | null;
   /** Change in percentage points against each comparison period. */
   comparisons: { kind: ComparisonKind; label: string; pct: number | null; deltaPts: number | null }[];
@@ -76,7 +76,7 @@ export function punctualitySlide(set: ReportSet, kind: PunctualityKind): Punctua
   const late = { total: cur.notOk, oneWorkday: cur.lateByWorkdays[1] ?? 0 };
 
   // Texts
-  const subject = kind === "loading" ? "outbound rides were fully loaded on the planned day" : "inbound rides were fully stocked on the unloading day";
+  const subject = kind === "loading" ? "outbound rides were fully loaded on the planned day" : "inbound rides were stocked within one workday";
   let headline: string;
   if (cur.pct === null) {
     headline = kind === "loading" ? "No measurable outbound rides in this period." : "No measurable inbound rides in this period.";
@@ -91,7 +91,9 @@ export function punctualitySlide(set: ReportSet, kind: PunctualityKind): Punctua
     const w = pointsWords(primary.deltaPts);
     context.push(`${w.charAt(0).toUpperCase()}${w.slice(1)} on ${primary.label.replace(/^vs /, "")}.`);
   }
-  if (late.total > 0) {
+  if (late.total > 0 && kind === "stocking") {
+    context.push(`${plural(late.total, "ride took", "rides took")} longer.`);
+  } else if (late.total > 0) {
     context.push(
       late.oneWorkday === late.total
         ? `${plural(late.total, "ride was", "rides were")} late, all by one workday.`
@@ -102,14 +104,14 @@ export function punctualitySlide(set: ReportSet, kind: PunctualityKind): Punctua
   return {
     kind,
     title: kind === "loading" ? "On time loading" : "Inbound stocked on time",
-    label: kind === "loading" ? "Rides loaded on time" : "Rides stocked on unloading day",
+    label: kind === "loading" ? "Rides loaded on time" : "Rides stocked within one workday",
     period,
     pct: cur.pct,
     target: cur.target,
     meetsTarget: cur.meetsTarget,
     ok: cur.ok,
     measured,
-    secondary: kind === "stocking" ? { label: "Within one workday", pct: cur.withinOneWorkday.pct } : null,
+    secondary: kind === "stocking" ? { label: "On the unloading day", pct: cur.onPlannedDay.pct } : null,
     comparisons,
     deltaPts: primary?.deltaPts ?? null,
     deltaLabel: primary?.label ?? null,

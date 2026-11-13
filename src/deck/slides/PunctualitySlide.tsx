@@ -253,7 +253,7 @@ function Chart({ model }: { model: PunctualitySlideModel }) {
               <div key={b.key} style={{ width: barW * 3 + gap * 2, textAlign: "center", whiteSpace: "nowrap" }}>
                 <div style={{ fontSize: 12, fontWeight: 500, color: T.heroText }}>{b.label}</div>
                 <div style={{ fontSize: 10.5, color: b.pct !== null && b.pct < model.target ? BELOW : T.textSecondary, marginTop: 2 }}>
-                  {b.pct === null ? "" : `Total ${fmtDec(b.pct)}%`}
+                  {b.pct === null ? "" : `Total ${barValue(b.pct)}`}
                 </div>
               </div>
             ))}

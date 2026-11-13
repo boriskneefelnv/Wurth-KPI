@@ -160,18 +160,19 @@ describe("on-time loading", () => {
 });
 
 describe("inbound stocked", () => {
-  it("every pallet scanned in by the planned unloading day from Te lossen", () => {
+  it("every pallet scanned in within one workday after the planned unloading day from Te lossen", () => {
     const units = [
       unit({ inkomendeRit: "I1", inslag: "2026-04-02 20:00" }),
       unit({ inkomendeRit: "I1", inslag: "2026-04-02 21:00" }),
       unit({ inkomendeRit: "I2", inslag: "2026-04-02" }),
-      unit({ inkomendeRit: "I2", inslag: "2026-04-03" }), // a day after unloading
+      unit({ inkomendeRit: "I2", inslag: "2026-04-03" }), // one workday after unloading: still on time
       unit({ inkomendeRit: "I3", inslag: "2026-04-03" }), // not on the list
+      unit({ inkomendeRit: "I4", inslag: "2026-04-07" }), // Fri 3 Apr and (after Easter Monday) Tue 7 Apr: two workdays
     ];
-    const planned = plannedIndex([["inbound", "I1", "2026-04-02", 2], ["inbound", "I2", "2026-04-02", 2]]);
+    const planned = plannedIndex([["inbound", "I1", "2026-04-02", 2], ["inbound", "I2", "2026-04-02", 2], ["inbound", "I4", "2026-04-02", 1]]);
     const { rides } = materializeRides(units, { planned });
     const r = computeInboundStocked(buildContext(units, months(["2026-04"]), {}, rides));
-    expect(r).toMatchObject({ ok: 1, notOk: 1, pct: 50, withinOneWorkday: { ok: 2, notOk: 0, pct: 100 } });
+    expect(r).toMatchObject({ ok: 2, notOk: 1, graceWorkdays: 1, onPlannedDay: { ok: 1, notOk: 2 }, lateByWorkdays: { 2: 1 } });
   });
 
   it("is not measurable without ride lists", () => {

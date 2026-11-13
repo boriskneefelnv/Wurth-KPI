@@ -163,13 +163,18 @@ export function Presentation({
 
   const current = slides[idx]!;
   return (
-    <div ref={root} className="presenter" style={{ cursor: cursor || overview || !started ? "default" : "none" }}>
-      {started && (
-        <>
-          <button className="zone left" aria-label="Vorige slide" onClick={() => go(idx - 1)} />
-          <button className="zone right" aria-label="Volgende slide" onClick={() => go(idx + 1)} />
-        </>
-      )}
+    <div
+      ref={root}
+      className="presenter"
+      style={{ cursor: cursor || overview || !started ? "default" : "none" }}
+      onClick={(e) => {
+        // Click on the slide: left quarter goes back, elsewhere forward. No
+        // overlay elements, so hovering a chart still shows its values.
+        if (!started || overview) return;
+        const w = e.currentTarget.clientWidth;
+        go(e.clientX < w * 0.25 ? idx - 1 : idx + 1);
+      }}
+    >
       <div key={started ? idx : "start"} className="stage" style={{ width: SLIDE_W, height: SLIDE_H, transform: `scale(${scale})` }}>
         {started ? (
           current.render(idx + 1, slides.length)
@@ -225,11 +230,8 @@ function useDeckStyles() {
 }
 
 export const PRESENTER_CSS = `
-.presenter{position:fixed;inset:0;z-index:100;background:#000;display:grid;place-items:center;overflow:hidden;font-family:${FONT}}
+.presenter{position:fixed;inset:0;z-index:100;background:#000;display:grid;place-items:center;overflow:hidden;font-family:${FONT};user-select:none;-webkit-user-select:none;outline:none}
 .presenter .stage{position:relative;z-index:1;transform-origin:center center;animation:deckFadeIn 250ms ease-out}
-.presenter .zone{position:absolute;top:0;bottom:0;width:25%;z-index:2;background:transparent;border:0;padding:0;cursor:inherit}
-.presenter .zone.left{left:0}
-.presenter .zone.right{right:0}
 .presenter .start{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
   background:rgba(10,18,26,.55);border:0;color:#fff;font:600 20px ${FONT};cursor:pointer}
 .presenter .start .play{width:0;height:0;border-left:34px solid #fff;border-top:21px solid transparent;border-bottom:21px solid transparent;margin-left:8px}

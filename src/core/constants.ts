@@ -102,6 +102,8 @@ export const CONTAINER_CODES = {
 export const TARGETS = {
   onTimeLoadingPct: 95,
   inboundStockedPct: 95,
+  /** Inbound counts as stocked on time when done within this many workdays after the unloading day. */
+  inboundStockedGraceWorkdays: 1,
   complaintFreePct: 95,
 } as const;
 
