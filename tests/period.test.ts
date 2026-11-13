@@ -2,6 +2,7 @@ import {
   availableComparisons,
   availablePeriods,
   bucketsFor,
+  comparisonOptions,
   comparisonPeriod,
   detectCoverage,
   isCovered,
@@ -88,5 +89,23 @@ describe("coverage", () => {
     expect(availableComparisons(makePeriod("quarter", "2025-Q3"), cov)).toEqual(["previous"]);
     expect(availableComparisons(makePeriod("half", "2026-H1"), cov)).toEqual(["previous"]);
     expect(availableComparisons(makePeriod("month", "2025-04"), cov)).toEqual([]);
+  });
+});
+
+describe("year to date", () => {
+  it("runs from 1 January to the end of the month in the key", () => {
+    expect(makePeriod("ytd", "2026-09")).toMatchObject({ from: "2026-01-01", to: "2026-09-30", label: "Jan to Sep 2026" });
+  });
+
+  it("compares only with the same months last year", () => {
+    const p = makePeriod("ytd", "2026-09");
+    expect(comparisonOptions("ytd")).toEqual(["lastYear"]);
+    expect(comparisonPeriod(p, "lastYear")).toMatchObject({ kind: "ytd", from: "2025-01-01", to: "2025-09-30" });
+  });
+
+  it("offers every covered month end from February on, monthly buckets", () => {
+    const ps = availablePeriods("ytd", { from: "2025-12-01", to: "2026-09-30" });
+    expect(ps.map((p) => p.key)).toEqual(["2026-09", "2026-08", "2026-07", "2026-06", "2026-05", "2026-04", "2026-03", "2026-02"]);
+    expect(bucketsFor(ps[0]!).map((b) => b.label)).toEqual(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep"]);
   });
 });

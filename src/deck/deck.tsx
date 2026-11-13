@@ -29,6 +29,7 @@ const REVIEW: Record<string, string> = {
   quarter: "Quarterly Business Review",
   half: "Half-year Business Review",
   year: "Annual Business Review",
+  ytd: "Year to Date Business Review",
   custom: "Business Review",
 };
 

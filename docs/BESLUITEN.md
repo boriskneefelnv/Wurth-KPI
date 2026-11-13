@@ -202,6 +202,13 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B104 | Vlaggen (country-flag-icons, 3:2) offline: de app laadt alleen de vlaggen van de landen in het rapport, de HTML-export bevat alleen die vlaggen als data: URI. |
 | B105 | Slide "Outbound destinations worldwide" (na werkdruk): landen gekleurd naar aantal ritten, de top 10 routes vanaf Rotterdam als bogen, top 10 met vlag, ritten en HU's; hover toont per principal. Kaart (world-atlas 110m) zit in de bundel, dus werkt zonder internet. Rangorde op ritten. Een rit naar twee landen telt voor beide. |
 
+## Year to date (13 nov)
+
+| # | Besluit |
+|---|---|
+| B106 | Nieuwe rapportsoort "Jaar tot nu toe" (ytd): 1 januari tot en met de laatste gekozen maand, staven per maand, label "Jan to Sep 2026". Aangeboden voor elke maand vanaf februari die de data dekt. |
+| B107 | Year to date vergelijkt alleen met dezelfde maanden vorig jaar (Jan to Sep 2025); "vorige periode" heeft hier geen betekenis. Een weergave van januari tot een maand die geen kwartaal- of halfjaareinde is, kiest standaard deze soort. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

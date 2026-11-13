@@ -9,8 +9,9 @@ import type { DayKey } from "./types";
  * are fully covered by the imported data can be chosen (see Coverage).
  */
 
-export type ReportKind = "week" | "month" | "quarter" | "half" | "year";
-export const REPORT_KINDS: readonly ReportKind[] = ["week", "month", "quarter", "half", "year"];
+/** `ytd`: year to date, 1 January up to and including the month in the key. */
+export type ReportKind = "week" | "month" | "quarter" | "half" | "year" | "ytd";
+export const REPORT_KINDS: readonly ReportKind[] = ["week", "month", "quarter", "half", "year", "ytd"];
 
 export type ComparisonKind = "previous" | "lastYear";
 
@@ -141,6 +142,16 @@ export function makePeriod(kind: ReportKind, key: string): ReportPeriod {
       if (!/^\d{4}$/.test(key)) throw new Error(`Ongeldig jaar: ${key}`);
       return { kind, key, label: key, from: `${key}-01-01`, to: `${key}-12-31` };
     }
+    case "ytd": {
+      const { year, month } = parsePeriod(key);
+      return {
+        kind,
+        key: `${year}-${pad(month)}`,
+        label: month === 1 ? `Jan ${year}` : `Jan to ${MONTHS_EN[month - 1]} ${year}`,
+        from: `${year}-01-01`,
+        to: `${year}-${pad(month)}-${pad(lastDayOfMonth(year, month))}`,
+      };
+    }
   }
 }
 
@@ -166,6 +177,8 @@ export function periodContaining(kind: ReportKind, k: DayKey): ReportPeriod {
       return makePeriod("half", `${y}-H${m <= 6 ? 1 : 2}`);
     case "year":
       return makePeriod("year", String(y));
+    case "ytd":
+      return makePeriod("ytd", k.slice(0, 7));
   }
 }
 
@@ -175,6 +188,7 @@ export function periodContaining(kind: ReportKind, k: DayKey): ReportPeriod {
  */
 export function comparisonPeriod(p: ReportPeriod, comparison: ComparisonKind): ReportPeriod {
   if (p.kind === "custom") throw new Error("Vrije periodes hebben geen vergelijking");
+  if (comparison === "previous" && p.kind === "ytd") throw new Error("Year to date vergelijkt alleen met vorig jaar");
   if (comparison === "previous") return periodContaining(p.kind, addDays(p.from, -1));
   if (p.kind === "week") {
     const { year, week } = isoWeek(p.from);
@@ -182,16 +196,19 @@ export function comparisonPeriod(p: ReportPeriod, comparison: ComparisonKind): R
     return makePeriod("week", `${year - 1}-W${pad(target)}`);
   }
   const y = Number(p.from.slice(0, 4));
+  if (p.kind === "ytd") return makePeriod("ytd", `${y - 1}${p.key.slice(4)}`);
   return periodContaining(p.kind, `${y - 1}${p.from.slice(4)}`);
 }
 
 /** Comparisons that make sense per report kind (year: previous year = same period last year). */
 export function comparisonOptions(kind: ReportKind): ComparisonKind[] {
+  if (kind === "ytd") return ["lastYear"]; // the same months last year; "previous" has no meaning here
   return kind === "week" || kind === "year" ? ["previous"] : ["previous", "lastYear"];
 }
 
 /** Default selection: month compares with previous month; quarter/half with both. */
 export function defaultComparisons(kind: ReportKind): ComparisonKind[] {
+  if (kind === "ytd") return ["lastYear"];
   return kind === "quarter" || kind === "half" ? ["previous", "lastYear"] : ["previous"];
 }
 
@@ -305,6 +322,16 @@ export function isCovered(p: DateRange, coverage: Coverage | null): boolean {
 export function availablePeriods(kind: ReportKind, coverage: Coverage | null): ReportPeriod[] {
   if (!coverage) return [];
   const out: ReportPeriod[] = [];
+  if (kind === "ytd") {
+    // Every month end since 1 January that the data covers, from February on
+    // (January alone is the month report).
+    for (let m = periodContaining("month", coverage.to); m.to >= coverage.from; m = periodContaining("month", addDays(m.from, -1))) {
+      if (m.key.endsWith("-01")) continue;
+      const p = makePeriod("ytd", m.key);
+      if (isCovered(p, coverage)) out.push(p);
+    }
+    return out;
+  }
   let p = periodContaining(kind, coverage.to);
   while (p.to >= coverage.from) {
     if (isCovered(p, coverage)) out.push(p);

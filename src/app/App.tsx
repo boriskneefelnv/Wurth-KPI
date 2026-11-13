@@ -25,7 +25,7 @@ import { SLIDE_H, SLIDE_W } from "../deck/tokens";
 import { buildControlListXlsx } from "./controlList";
 import type { Dataset, FileInfo } from "./load";
 
-const KIND_LABEL: Record<ReportKind, string> = { week: "Week", month: "Maand", quarter: "Kwartaal", half: "Half jaar", year: "Jaar" };
+const KIND_LABEL: Record<ReportKind, string> = { week: "Week", month: "Maand", quarter: "Kwartaal", half: "Half jaar", year: "Jaar", ytd: "Jaar tot nu toe" };
 const COMPARISON_LABEL: Record<ComparisonKind, string> = { previous: "Vorige periode", lastYear: "Zelfde periode vorig jaar" };
 const FILE_KIND_LABEL = { units: "Unitoverzicht", "ride-list-outbound": "Te laden ritten", "ride-list-inbound": "Te lossen ritten" } as const;
 
@@ -65,6 +65,8 @@ function kindFor(r: DisplayRange): ReportKind {
   const [y1, m1] = r.from.split("-").map(Number) as [number, number];
   const [y2, m2] = r.to.split("-").map(Number) as [number, number];
   const n = (y2 - y1) * 12 + (m2 - m1) + 1;
+  // From January up to a month that is not a quarter or half year end: year to date.
+  if (m1 === 1 && y1 === y2 && n > 1 && n < 12 && n !== 3 && n !== 6) return "ytd";
   return n <= 1 ? "month" : n <= 3 ? "quarter" : n <= 6 ? "half" : "year";
 }
 const pct = (x: number | null) => (x === null ? "" : `${(x * 100).toLocaleString("nl-NL", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`);

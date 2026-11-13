@@ -1,4 +1,4 @@
-import { availableComparisons, comparisonPeriod, type ComparisonKind, type Coverage, type ReportPeriod } from "../period";
+import { availableComparisons, comparisonOptions, comparisonPeriod, type ComparisonKind, type Coverage, type ReportPeriod } from "../period";
 import type { DayKey, Direction, Ride, WmsUnit } from "../types";
 import type { PlannedRideIndex } from "../wms/rideLists";
 import { directionalDate, rideOf } from "../wms/rides";
@@ -55,7 +55,7 @@ export function comparisonOptionsWithQuality(
 ): ComparisonOption[] {
   if (period.kind === "custom") return [];
   const covered = new Set(availableComparisons(period, coverage));
-  const kinds: ComparisonKind[] = period.kind === "week" || period.kind === "year" ? ["previous"] : ["previous", "lastYear"];
+  const kinds: ComparisonKind[] = comparisonOptions(period.kind);
   return kinds.map((kind) => {
     const p = comparisonPeriod(period, kind);
     if (!covered.has(kind)) {
