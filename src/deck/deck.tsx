@@ -2,10 +2,12 @@ import type { ReactNode } from "react";
 import type { ReportSet } from "../core/report/report";
 import { dailySlide } from "../core/slides/daily";
 import { punctualitySlide } from "../core/slides/punctuality";
+import { destinationsSlide } from "../core/slides/destinations";
 import { storageSlide } from "../core/slides/storage";
 import { volumeSlide, type VolumeSlideSubject } from "../core/slides/volume";
 import { PunctualitySlide } from "./slides/PunctualitySlide";
 import { StorageSlide } from "./slides/StorageSlide";
+import { DestinationsSlide } from "./slides/DestinationsSlide";
 import { ClosingSlide } from "./slides/ClosingSlide";
 import { DailySlide } from "./slides/DailySlide";
 import { CoverSlide } from "./slides/CoverSlide";
@@ -90,6 +92,11 @@ export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
       id: "storage-duration",
       title: "Storage duration",
       render: (page: number, total: number) => <StorageSlide model={storageSlide(set)} page={page} total={total} />,
+    },
+    {
+      id: "storage-destinations",
+      title: "Storage per destination",
+      render: (page: number, total: number) => <DestinationsSlide model={destinationsSlide(set)} page={page} total={total} />,
     },
     { id: "closing", title: "Closing", render: () => <ClosingSlide footer={`Würth · ${p.label}`} /> },
   ];

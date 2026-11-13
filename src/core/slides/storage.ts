@@ -56,6 +56,8 @@ const statsOf = (s: { storage: { total: StorageStats; perPrincipal: Record<strin
 /** Days with one decimal, whole numbers without: "17,3", "13". */
 export const fmtDays = (n: number) => (Number.isInteger(n) ? fmtInt(n) : fmtDec(n));
 const days = (n: number) => `${fmtDays(n)} ${n === 1 ? "day" : "days"}`;
+/** Averages and changes always with one decimal. */
+const avgDays = (n: number) => `${fmtDec(n)} days`;
 
 export function storageSlide(set: ReportSet): StorageSlideModel {
   const period = set.current.period;
@@ -89,16 +91,16 @@ export function storageSlide(set: ReportSet): StorageSlideModel {
         if (avgDelta !== null && primary) {
           change = Math.abs(avgDelta) < 0.5
             ? `, about the same as in ${primary.report.period.label}`
-            : `, ${days(Math.abs(avgDelta))} ${avgDelta < 0 ? "shorter" : "longer"} than in ${primary.report.period.label}`;
+            : `, ${avgDays(Math.abs(avgDelta))} ${avgDelta < 0 ? "shorter" : "longer"} than in ${primary.report.period.label}`;
         }
-        parts.push(`HUs stayed ${days(s.avgDays)} on average (median ${days(s.medianDays!)})${change}.`);
+        parts.push(`HUs stayed ${avgDays(s.avgDays)} on average (median ${days(s.medianDays!)})${change}.`);
         const within30 = ((s.buckets["0-7"] + s.buckets["8-14"] + s.buckets["15-30"]) / s.count) * 100;
         if (key === "Total" && primary && avgDelta !== null) {
           // A principal without HUs in the comparison period changes the mix.
           for (const p of MAIN_PRINCIPALS) {
             const now = set.current.storage.perPrincipal[p];
             if (now.count > 0 && now.avgDays !== null && primary.report.storage.perPrincipal[p].count === 0) {
-              parts.push(`${p}, not yet active in ${primary.report.period.label}, averages ${days(now.avgDays)}.`);
+              parts.push(`${p}, not yet active in ${primary.report.period.label}, averages ${avgDays(now.avgDays)}.`);
             }
           }
         }

@@ -184,6 +184,15 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B96 | Langere of kortere opslag is geen goed of slecht: het verschil krijgt een neutrale kleur. Een principal die in de vergelijkingsperiode nog niet actief was, wordt in de tekst genoemd (H1 2026: AWKG, gemiddeld 30,7 dagen). |
 | B97 | Knoppen per principal staan op alle slides met knoppen boven de kaarten, omdat kaarten en grafieken allebei meewisselen. |
 
+## Opslag per bestemming (13 nov)
+
+| # | Besluit |
+|---|---|
+| B98 | Slide "Storage per destination": top 10 landen op aantal HU's (niet op langste opslag, want dan staan kleine landen bovenaan), met per land de gemiddelde opslagduur als liggende staaf, vorig jaar als streep en het gemiddelde over alle bestemmingen als stippellijn. Dagen en HU's in vaste kolommen. |
+| B99 | "Longest" en "Shortest storage" tellen alleen landen met minstens 0,5% van de HU's (en minstens 5). HU's zonder Los land vallen buiten deze slide (85 in H1 2026). |
+| B100 | Gemiddelden en verschillen altijd met één decimaal (17,2 days); medianen als heel getal wanneer ze heel zijn. |
+| B101 | De oude top-10 berekening (computeStorageTop) is vervangen door computeStorageDestinations per principal. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

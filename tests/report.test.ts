@@ -5,7 +5,7 @@ import { classifyProfile, computeFlow } from "@/core/report/profiles";
 import { computeInboundStocked, computeOnTimeLoading } from "@/core/report/punctuality";
 import { computeReport } from "@/core/report/report";
 import { computeStock } from "@/core/report/stock";
-import { computeStorage, computeStorageTop } from "@/core/report/storage";
+import { computeStorage, computeStorageDestinations } from "@/core/report/storage";
 import { computeContainerMix, computeDestinations, computeVolume } from "@/core/report/workload";
 import type { WmsUnit } from "@/core/types";
 import type { PlannedRideIndex } from "@/core/wms/rideLists";
@@ -199,12 +199,11 @@ describe("storage", () => {
     expect(s.perPrincipal.AWKG.avgDays).toBe(100);
   });
 
-  it("top destinations need 5 HUs; principal dots need 3", () => {
-    const t = computeStorageTop(c);
-    expect(t.overall.map((r) => r.country)).toEqual(["DE"]);
-    expect(t.overall[0]!.perPrincipal.WIAG.avgDays).toBe(12);
-    expect(t.overall[0]!.perPrincipal.AWKG.avgDays).toBeNull();
-    expect(t.perPrincipal.WIAG.map((r) => r.country)).toEqual(["DE"]);
+  it("storage per destination, most HUs first, per principal", () => {
+    const t = computeStorageDestinations(c);
+    expect(t.Total.map((r) => [r.country, r.hus, r.avgDays])).toEqual([["DE", 7, (10 + 11 + 12 + 13 + 14 + 200) / 7], ["AT", 4, 50]]);
+    expect(t.WIAG).toEqual([{ country: "DE", hus: 5, avgDays: 12, medianDays: 12 }, { country: "AT", hus: 4, avgDays: 50, medianDays: 50 }]); // AT defaults to WIAG
+    expect(t.AWKG[0]).toMatchObject({ country: "DE", avgDays: 100 });
   });
 });
 

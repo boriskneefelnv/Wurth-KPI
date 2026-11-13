@@ -26,7 +26,7 @@ export function StorageSlide({ model, page, total }: { model: StorageSlideModel;
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
         <Card index={0} label="Average storage" value={view.avgDays} decimals unit="days" delta={view.avgDelta} deltaLabel={model.comparisonLabel} />
-        <Card index={1} label="Median storage" value={view.medianDays} decimals unit="days" delta={view.medianDelta} deltaLabel={model.comparisonLabel} />
+        <Card index={1} label="Median storage" value={view.medianDays} decimals whole unit="days" delta={view.medianDelta} deltaLabel={model.comparisonLabel} />
         <Card index={2} label="HUs measured" value={view.count} sub="Shipped with a storage duration" />
         <Card index={3} label="Over 60 days" value={over.share} decimals unit="%" sub={`${fmtInt(over.count)} HUs`} />
       </div>
@@ -43,6 +43,7 @@ function Card({
   label,
   value,
   decimals,
+  whole,
   unit,
   sub,
   delta,
@@ -52,6 +53,8 @@ function Card({
   label: string;
   value: number | null;
   decimals?: boolean;
+  /** Show whole numbers without a decimal (medians). */
+  whole?: boolean;
   unit?: string;
   sub?: string;
   delta?: number | null;
@@ -65,7 +68,7 @@ function Card({
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: T.inbound, textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 5 }}>
         <span style={{ fontSize: 30, fontWeight: 700, color: T.heroText, lineHeight: 1.05, fontVariantNumeric: "tabular-nums" }}>
-          {value === null ? "n/a" : decimals ? (n === value ? fmtDays(n) : fmtDec(n)) : fmtInt(n)}
+          {value === null ? "n/a" : whole && n === value ? fmtDays(n) : decimals ? fmtDec(n) : fmtInt(n)}
           {value !== null && unit === "%" ? "%" : ""}
         </span>
         {value !== null && unit && unit !== "%" && <span style={{ fontSize: 13, color: T.textSecondary }}>{unit}</span>}
@@ -83,7 +86,7 @@ function DaysDelta({ days, label }: { days: number; label: string }) {
   const style = same ? { background: "#E9EFF5", color: "#475569" } : days < 0 ? { background: "#E3EEF7", color: T.inbound } : { background: "#F1F0EC", color: "#5F5A4E" };
   return (
     <span style={{ display: "inline-flex", gap: 5, padding: "2px 8px", borderRadius: 10, fontSize: 10.5, whiteSpace: "nowrap", ...style }}>
-      <strong>{same ? "same" : `${days > 0 ? "+" : "-"}${fmtDays(Math.abs(days))} days`}</strong>
+      <strong>{same ? "same" : `${days > 0 ? "+" : "-"}${fmtDec(Math.abs(days))} days`}</strong>
       <span style={{ opacity: 0.85 }}>{label}</span>
     </span>
   );

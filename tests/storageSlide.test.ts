@@ -25,14 +25,14 @@ describe("storage slide model", () => {
       ["31 to 60 days", 0],
       ["Over 60 days", 0],
     ]);
-    expect(w.headline).toBe("HUs stayed 15 days on average (median 15 days), 5 days shorter than in Q1 2026. 100% left the warehouse within 30 days.");
+    expect(w.headline).toBe("HUs stayed 15,0 days on average (median 15 days), 5,0 days shorter than in Q1 2026. 100% left the warehouse within 30 days.");
     expect(w.perPeriod.map((p) => [p.label, p.avgDays])).toEqual([["Apr", 10], ["May", 20], ["Jun", null]]);
   });
 
   it("has no change for a principal without HUs in the comparison period", () => {
     expect(m.views.AWKG.avgDelta).toBeNull();
     expect(m.views.AWKG.groups[4]!.share).toBe(100);
-    expect(m.views.Total.headline).toContain("AWKG, not yet active in Q1 2026, averages 70 days.");
+    expect(m.views.Total.headline).toContain("AWKG, not yet active in Q1 2026, averages 70,0 days.");
     expect(m.views.Total.headline).not.toMatch(/[–—−]/);
   });
 });

@@ -1,6 +1,5 @@
-import { STORAGE_TOP } from "../constants";
-import type { Principal, StorageBucket, WmsUnit } from "../types";
-import { PRINCIPALS, STORAGE_BUCKETS } from "../types";
+import type { MainPrincipal, Principal, StorageBucket, WmsUnit } from "../types";
+import { MAIN_PRINCIPALS, PRINCIPALS, STORAGE_BUCKETS } from "../types";
 import { bucketIndex } from "../period";
 import { mean, median, type ReportContext } from "./context";
 
@@ -55,54 +54,35 @@ export function computeStorage(ctx: ReportContext): StorageBlock {
 }
 
 export interface StorageDestination {
+  /** Destination country ("Los land", ISO code). */
   country: string;
   hus: number;
   avgDays: number;
-  /** Null when the principal has fewer than 3 HUs to this country. */
-  perPrincipal: Record<Principal, { hus: number; avgDays: number | null }>;
+  medianDays: number;
 }
 
-export interface StorageTopBlock {
-  /** Countries with ≥5 HUs, by average storage days desc, top 10. */
-  overall: StorageDestination[];
-  /** Per principal: countries with ≥5 HUs of that principal, top 8. */
-  perPrincipal: Record<Principal, { country: string; hus: number; avgDays: number }[]>;
-}
+/** Per view (all principals, or one main principal): every destination, most HUs first. */
+export type StorageDestinationsBlock = Record<MainPrincipal | "Total", StorageDestination[]>;
 
-export function computeStorageTop(ctx: ReportContext): StorageTopBlock {
+/**
+ * Storage duration per destination country, over the same HUs as
+ * computeStorage. HUs without a destination are left out.
+ */
+export function computeStorageDestinations(ctx: ReportContext): StorageDestinationsBlock {
   const pop = storagePopulation(ctx).filter((u) => u.losLand);
-  const byCountry = new Map<string, WmsUnit[]>();
-  for (const u of pop) {
-    let l = byCountry.get(u.losLand!);
-    if (!l) byCountry.set(u.losLand!, (l = []));
-    l.push(u);
-  }
-
-  const overall: StorageDestination[] = [];
-  for (const [country, units] of byCountry) {
-    if (units.length < STORAGE_TOP.minHusPerCountry) continue;
-    const perPrincipal = {} as StorageDestination["perPrincipal"];
-    for (const p of PRINCIPALS) {
-      const pu = units.filter((u) => u.principal === p);
-      perPrincipal[p] = {
-        hus: pu.length,
-        avgDays: pu.length >= STORAGE_TOP.minHusPerPrincipalDot ? mean(pu.map((u) => u.dagenInOpslag!)) : null,
-      };
+  const rows = (units: WmsUnit[]): StorageDestination[] => {
+    const byCountry = new Map<string, number[]>();
+    for (const u of units) {
+      let l = byCountry.get(u.losLand!);
+      if (!l) byCountry.set(u.losLand!, (l = []));
+      l.push(u.dagenInOpslag!);
     }
-    overall.push({ country, hus: units.length, avgDays: mean(units.map((u) => u.dagenInOpslag!))!, perPrincipal });
-  }
-  overall.sort((a, b) => b.avgDays - a.avgDays || b.hus - a.hus);
-
-  const perPrincipal = {} as StorageTopBlock["perPrincipal"];
-  for (const p of PRINCIPALS) {
-    const rows: { country: string; hus: number; avgDays: number }[] = [];
-    for (const [country, units] of byCountry) {
-      const pu = units.filter((u) => u.principal === p);
-      if (pu.length < STORAGE_TOP.minHusPerCountry) continue;
-      rows.push({ country, hus: pu.length, avgDays: mean(pu.map((u) => u.dagenInOpslag!))! });
-    }
-    perPrincipal[p] = rows.sort((a, b) => b.avgDays - a.avgDays || b.hus - a.hus).slice(0, STORAGE_TOP.perPrincipalTopN);
-  }
-
-  return { overall: overall.slice(0, STORAGE_TOP.topN), perPrincipal };
+    return [...byCountry]
+      .map(([country, days]) => ({ country, hus: days.length, avgDays: mean(days)!, medianDays: median(days)! }))
+      .sort((a, b) => b.hus - a.hus || a.country.localeCompare(b.country));
+  };
+  return {
+    Total: rows(pop),
+    ...Object.fromEntries(MAIN_PRINCIPALS.map((p) => [p, rows(pop.filter((u) => u.principal === p))])),
+  } as StorageDestinationsBlock;
 }

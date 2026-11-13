@@ -110,13 +110,6 @@ export const TARGETS = {
 /** KPI-overview colouring for complaint-free percentages. */
 export const STATUS_THRESHOLDS = { green: 95, amber: 90 } as const;
 
-export const STORAGE_TOP = {
-  minHusPerCountry: 5,
-  topN: 10,
-  minHusPerPrincipalDot: 3,
-  perPrincipalTopN: 8,
-} as const;
-
 export const DESTINATIONS_TOP_N = 10;
 export const SANKEY_TOP_COUNTRIES = 8;
 
