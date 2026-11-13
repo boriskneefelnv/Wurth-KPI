@@ -13,9 +13,8 @@ import { FONT, T } from "../tokens";
  */
 export function VolumeSlide({ model, page, total }: { model: VolumeSlideModel; page: number; total: number }) {
   const title = model.subject === "Total" ? "Total volume" : `${model.subject} volume`;
-  const subtitle = [model.headline, model.context].filter(Boolean).join(" ");
   return (
-    <SlideShell title={title} subtitle={subtitle} page={page} total={total}>
+    <SlideShell title={title} page={page} total={total}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 18 }}>
         <Hero index={0} label="Inbound HUs" value={model.inbound.totalHus} changes={model.inbound.comparisons} pick="hus" fallback={perWorkday(model.inbound)} />
         <Hero index={1} label="Inbound rides" value={model.inbound.totalRides} changes={model.inbound.comparisons} pick="rides" fallback={perRide(model.inbound)} />
@@ -116,7 +115,7 @@ function Chart({ model }: { model: VolumeSlideModel }) {
   const ghostOut = model.outbound.ghostHus;
   const { max, ticks } = niceMax(Math.max(...inArr, ...outArr, ...(ghostIn ?? []), ...(ghostOut ?? [])));
 
-  const PLOT_H = 292;
+  const PLOT_H = 282;
   const Y_W = 52;
   const barW = n <= 4 ? 52 : n <= 7 ? 40 : n <= 10 ? 26 : 20;
   const gap = 4;
@@ -128,7 +127,7 @@ function Chart({ model }: { model: VolumeSlideModel }) {
   return (
     <div style={{ flex: 1, minHeight: 0, background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "18px 24px 14px", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: T.textSecondary }}>{per} · HUs inbound and outbound</div>
+        <div style={{ fontSize: 12, color: T.textSecondary }}>{per} · HUs inbound and outbound, rides below</div>
         <div style={{ display: "flex", gap: 18 }}>
           <Legend swatch={<span style={{ width: 12, height: 12, borderRadius: 2, background: T.inbound }} />} label="Inbound" />
           <Legend swatch={<span style={{ width: 12, height: 12, borderRadius: 2, background: T.outbound }} />} label="Outbound" />
@@ -168,8 +167,8 @@ function Chart({ model }: { model: VolumeSlideModel }) {
                       left={groupW / 2}
                       bottom={Math.max(h(inArr[i]!), h(outArr[i]!)) + 26}
                       rows={[
-                        ["Inbound", inArr[i]!, ghostIn?.[i]],
-                        ["Outbound", outArr[i]!, ghostOut?.[i]],
+                        [`Inbound · ${fmtInt(model.inbound.rides[i]!)} rides`, inArr[i]!, ghostIn?.[i]],
+                        [`Outbound · ${fmtInt(model.outbound.rides[i]!)} rides`, outArr[i]!, ghostOut?.[i]],
                       ]}
                       ghostLabel={model.ghost?.label}
                     />
@@ -178,7 +177,19 @@ function Chart({ model }: { model: VolumeSlideModel }) {
               );
             })}
           </div>
-          <div style={{ display: "flex", justifyContent: "space-around", padding: "0 12px", marginTop: 8 }}>
+          <div style={{ position: "relative", display: "flex", justifyContent: "space-around", padding: "0 12px", marginTop: 6 }}>
+            <div style={{ position: "absolute", left: -Y_W, width: Y_W - 10, textAlign: "right", top: 1, fontSize: 10, color: T.axis }}>Rides</div>
+            {model.buckets.map((b, i) => (
+              <div key={b.key} style={{ width: groupW, display: "flex", gap, ...entry(animate, "deckFadeIn", ANIM.labelIn, i * ANIM.barStagger + ANIM.barGrow) }}>
+                {[model.inbound.rides[i]!, model.outbound.rides[i]!].map((r, k) => (
+                  <div key={k} style={{ width: barW, textAlign: "center", fontSize: 11, fontWeight: 600, color: k === 0 ? T.inbound : "#3B87B8", fontVariantNumeric: "tabular-nums" }}>
+                    {showValues || barW >= 20 ? fmtInt(r) : ""}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-around", padding: "0 12px", marginTop: 6 }}>
             {model.buckets.map((b) => (
               <div key={b.key} style={{ width: groupW, textAlign: "center", fontSize: 12, fontWeight: 500, color: T.heroText, whiteSpace: "nowrap" }}>
                 {b.label}
@@ -291,9 +302,9 @@ function Tooltip({
     <div
       style={{
         position: "absolute",
-        left: left - 105,
+        left: left - 135,
         bottom,
-        width: 210,
+        width: 270,
         zIndex: 20,
         background: "#fff",
         border: `1px solid ${T.inbound}`,

@@ -16,9 +16,8 @@ const BELOW = "#B5652B";
  * monthly chart per principal with the target line.
  */
 export function PunctualitySlide({ model, page, total }: { model: PunctualitySlideModel; page: number; total: number }) {
-  const subtitle = [model.headline, model.context].filter(Boolean).join(" ");
   return (
-    <SlideShell title={model.title} subtitle={subtitle} page={page} total={total}>
+    <SlideShell title={model.title} page={page} total={total}>
       <div style={{ display: "grid", gridTemplateColumns: "1.25fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
         <Card
           index={0}

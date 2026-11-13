@@ -19,6 +19,8 @@ import { assetUrls } from "../deck/assets";
 import { buildDeck, longDate, type SlideDef } from "../deck/deck";
 import { inlineAssets, interactiveDeckDocument, renderSlidesStatic } from "../deck/exportHtml";
 import { Presentation } from "../deck/Presentation";
+import { flagCodes, FlagsContext, type DeckFlags } from "../deck/flags";
+import { loadFlags } from "../deck/loadFlags";
 import { SLIDE_H, SLIDE_W } from "../deck/tokens";
 import { buildControlListXlsx } from "./controlList";
 import type { Dataset, FileInfo } from "./load";
@@ -233,6 +235,17 @@ export function App() {
     download(`Controlelijst ritten ${dataRange.from} tm ${dataRange.to}.xlsx`, await buildControlListXlsx(issues), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   }
 
+  // Flags for the destinations in this report (loaded lazily, only those needed).
+  const [flags, setFlags] = useState<DeckFlags>({});
+  useEffect(() => {
+    if (!reportSet) return;
+    let alive = true;
+    void loadFlags(flagCodes(reportSet)).then((f) => alive && setFlags(f));
+    return () => {
+      alive = false;
+    };
+  }, [reportSet]);
+
   /** One HTML file with the same presentation as in the app (runtime, data and images inside). */
   async function standaloneDeck(): Promise<string> {
     if (!reportSet) throw new Error("Geen rapport");
@@ -240,8 +253,8 @@ export function App() {
     const runtime = await (await fetch(`${import.meta.env.BASE_URL}runtime/present.js`)).text();
     return interactiveDeckDocument({
       runtime,
-      data: { set: reportSet, meetingDate, assets },
-      printSlides: renderSlidesStatic(slides, assets),
+      data: { set: reportSet, meetingDate, assets, flags },
+      printSlides: renderSlidesStatic(slides, assets, flags),
       title: `QBR Würth ${reportSet.current.period.label}`,
     });
   }
@@ -271,6 +284,7 @@ export function App() {
   }
 
   return (
+    <FlagsContext.Provider value={flags}>
     <div className="app">
       <header className="top">
         <img className="brand-logo" src={`${import.meta.env.BASE_URL}brand/neelevat-maasvlakte-blue.png`} alt="Neele-Vat Maasvlakte" />
@@ -509,6 +523,7 @@ export function App() {
       )}
       {presenting !== null && slides.length > 0 && <Presentation slides={slides} start={presenting} onClose={() => setPresenting(null)} />}
     </div>
+    </FlagsContext.Provider>
   );
 }
 

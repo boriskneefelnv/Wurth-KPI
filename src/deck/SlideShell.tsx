@@ -9,13 +9,14 @@ import { FONT, SLIDE_H, SLIDE_W, T } from "./tokens";
  */
 export function SlideShell({
   title,
-  subtitle,
+  topBar,
   page,
   total,
   children,
 }: {
   title: string;
-  subtitle?: ReactNode;
+  /** Controls next to the logo, left aligned (e.g. principal buttons). */
+  topBar?: ReactNode;
   page: number;
   total: number;
   children: ReactNode;
@@ -36,10 +37,8 @@ export function SlideShell({
         </h1>
       </div>
       <img src={a.neelevatLogo} alt="Neele-Vat" style={{ position: "absolute", top: 112, right: 48, height: 22, width: "auto", zIndex: 3 }} />
-      <div style={{ position: "absolute", top: 118, left: 48, right: 48, bottom: 48, display: "flex", flexDirection: "column" }}>
-        {subtitle && (
-          <div style={{ fontSize: 13, color: T.textSecondary, marginTop: -4, marginBottom: 16, maxWidth: 1000, lineHeight: 1.45 }}>{subtitle}</div>
-        )}
+      {topBar && <div style={{ position: "absolute", top: 106, left: 48, height: 34, display: "flex", alignItems: "center", zIndex: 3 }}>{topBar}</div>}
+      <div style={{ position: "absolute", top: 152, left: 48, right: 48, bottom: 44, display: "flex", flexDirection: "column" }}>
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>{children}</div>
       </div>
       <div

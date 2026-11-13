@@ -3,14 +3,17 @@ import { AssetsContext, type DeckAssets } from "./assets";
 import type { ReportSet } from "../core/report/report";
 import { StaticRenderContext } from "./anim";
 import type { SlideDef } from "./deck";
+import { FlagsContext, type DeckFlags } from "./flags";
 import { SLIDE_H, SLIDE_W } from "./tokens";
 
 /** Static markup of every slide (final state, no animations). */
-export function renderSlidesStatic(slides: SlideDef[], assets: DeckAssets): string[] {
+export function renderSlidesStatic(slides: SlideDef[], assets: DeckAssets, flags: DeckFlags = {}): string[] {
   return slides.map((s, i) =>
     renderToStaticMarkup(
       <StaticRenderContext.Provider value={true}>
-        <AssetsContext.Provider value={assets}>{s.render(i + 1, slides.length)}</AssetsContext.Provider>
+        <AssetsContext.Provider value={assets}>
+          <FlagsContext.Provider value={flags}>{s.render(i + 1, slides.length)}</FlagsContext.Provider>
+        </AssetsContext.Provider>
       </StaticRenderContext.Provider>,
     ),
   );
@@ -21,6 +24,7 @@ export interface EmbeddedDeckData {
   set: ReportSet;
   meetingDate: string;
   assets: DeckAssets;
+  flags?: DeckFlags;
 }
 
 const scriptSafe = (s: string) => s.replace(/<\/(script)/gi, "<\\/$1");

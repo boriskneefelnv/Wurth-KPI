@@ -107,6 +107,7 @@ export const DECK_KEYFRAMES = `
 @keyframes deckFadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes deckRiseIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes deckGrowX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes deckDraw { to { stroke-dashoffset: 0; } }
 `;
 
 /** Inline style for an entry animation, or nothing when rendering statically. */

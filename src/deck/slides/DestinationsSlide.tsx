@@ -3,6 +3,7 @@ import { fmtDec, fmtInt } from "../../core/slides/format";
 import type { DestinationsSlideModel, DestinationsView } from "../../core/slides/destinations";
 import type { StorageKey } from "../../core/slides/storage";
 import { ANIM, entry, useAnimate, useTweenNumber } from "../anim";
+import { Flag } from "../flags";
 import { PrincipalToggle } from "../PrincipalToggle";
 import { SlideShell } from "../SlideShell";
 import { T } from "../tokens";
@@ -18,11 +19,7 @@ export function DestinationsSlide({ model, page, total }: { model: DestinationsS
   const [key, setKey] = useState<StorageKey>("Total");
   const view = model.views[key];
   return (
-    <SlideShell title={model.title} subtitle={view.headline} page={page} total={total}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <PrincipalToggle options={model.order.map((k) => ({ key: k, label: model.views[k].label }))} selected={key} onSelect={setKey} />
-        <span style={{ fontSize: 11, color: T.textSecondary }}>HUs that left the warehouse in {model.period.label}, by destination country</span>
-      </div>
+    <SlideShell title={model.title} topBar={<PrincipalToggle options={model.order.map((k) => ({ key: k, label: model.views[k].label }))} selected={key} onSelect={setKey} />} page={page} total={total}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
         <Card index={0} label="Destinations" value={view.countries} sub={view.topShare === null ? "" : `Top ${view.top.length} take ${fmtInt(view.topShare)}% of HUs`} />
         <Card index={1} label="Average storage" value={view.avgDays} days sub={`Over ${fmtInt(view.hus)} HUs`} />
@@ -58,7 +55,7 @@ function Chart({ view, ghostLabel }: { view: DestinationsView; ghostLabel: strin
   const max = Math.max(10, ...rows.map((r) => Math.max(r.avgDays, r.ghostAvg ?? 0)), view.avgDays ?? 0) * 1.12;
   const pct = (v: number) => `${(v / max) * 100}%`;
   const showGhost = rows.some((r) => r.ghostAvg !== null);
-  const ROW_H = 28;
+  const ROW_H = 32;
   const glide = `width ${ANIM.switch}ms ease-out, left ${ANIM.switch}ms ease-out`;
   return (
     <div style={{ flex: 1, minHeight: 0, background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "12px 22px 10px", display: "flex", flexDirection: "column" }}>
@@ -79,7 +76,10 @@ function Chart({ view, ghostLabel }: { view: DestinationsView; ghostLabel: strin
           const delay = i * ANIM.barStagger;
           return (
             <Row key={i}>
-              <div style={{ height: ROW_H, display: "flex", alignItems: "center", fontSize: 12.5, fontWeight: 500, color: T.heroText, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</div>
+              <div style={{ height: ROW_H, display: "flex", alignItems: "center", gap: 9, fontSize: 12.5, fontWeight: 500, color: T.heroText, whiteSpace: "nowrap", overflow: "hidden" }}>
+                <Flag code={r.country} height={14} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+              </div>
               <div style={{ position: "relative", height: ROW_H }}>
                 {view.avgDays !== null && (
                   <div style={{ position: "absolute", top: 0, height: ROW_H, left: pct(view.avgDays), borderLeft: `2px dashed ${AVG}`, zIndex: 1, transition: `left ${ANIM.switch}ms ease-out`, ...entry(animate, "deckFadeIn", 300, ANIM.barGrow + 300) }} />

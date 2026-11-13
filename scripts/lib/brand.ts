@@ -22,3 +22,18 @@ export function loadRuntime(): string {
     throw new Error("public/runtime/present.js ontbreekt: draai eerst `npm run build:runtime`.");
   }
 }
+
+/** Flags for these ISO codes as data: URIs (command line). */
+export async function loadDeckFlags(codes: string[]): Promise<Record<string, string>> {
+  const { svgDataUri } = await import("../../src/deck/flags");
+  const out: Record<string, string> = {};
+  for (const code of codes) {
+    try {
+      const mod = (await import(`country-flag-icons/string/3x2/${code}`)) as { default: string };
+      out[code] = svgDataUri(mod.default);
+    } catch {
+      /* no flag for this code */
+    }
+  }
+  return out;
+}

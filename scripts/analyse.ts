@@ -31,7 +31,8 @@ import { buildDeck } from "../src/deck/deck";
 import { interactiveDeckDocument, renderSlidesStatic } from "../src/deck/exportHtml";
 import { loadRuntime } from "./lib/brand";
 import { buildControlListXlsx, ISSUE_LABEL } from "../src/app/controlList";
-import { loadDeckAssets } from "./lib/brand";
+import { loadDeckAssets, loadDeckFlags } from "./lib/brand";
+import { flagCodes } from "../src/deck/flags";
 
 const { values: args } = parseArgs({
   options: {
@@ -119,9 +120,10 @@ if (args.out) {
   const meetingDate = new Date().toISOString().slice(0, 10);
   const deck = buildDeck(set, new Date(`${meetingDate}T12:00:00`));
   const assets = loadDeckAssets();
+  const flags = await loadDeckFlags(flagCodes(set));
   writeFileSync(
     file,
-    interactiveDeckDocument({ runtime: loadRuntime(), data: { set, meetingDate, assets }, printSlides: renderSlidesStatic(deck, assets), title: `QBR Würth ${period.label}` }),
+    interactiveDeckDocument({ runtime: loadRuntime(), data: { set, meetingDate, assets, flags }, printSlides: renderSlidesStatic(deck, assets, flags), title: `QBR Würth ${period.label}` }),
   );
   console.log(`\n${file}`);
 }

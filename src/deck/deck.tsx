@@ -4,10 +4,12 @@ import { dailySlide } from "../core/slides/daily";
 import { punctualitySlide } from "../core/slides/punctuality";
 import { destinationsSlide } from "../core/slides/destinations";
 import { storageSlide } from "../core/slides/storage";
+import { worldMapSlide } from "../core/slides/worldMap";
 import { volumeSlide, type VolumeSlideSubject } from "../core/slides/volume";
 import { PunctualitySlide } from "./slides/PunctualitySlide";
 import { StorageSlide } from "./slides/StorageSlide";
 import { DestinationsSlide } from "./slides/DestinationsSlide";
+import { WorldMapSlide } from "./slides/WorldMapSlide";
 import { ClosingSlide } from "./slides/ClosingSlide";
 import { DailySlide } from "./slides/DailySlide";
 import { CoverSlide } from "./slides/CoverSlide";
@@ -72,6 +74,11 @@ export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
       id: "daily-workload",
       title: "Daily workload",
       render: (page: number, total: number) => <DailySlide model={dailySlide(set)} page={page} total={total} />,
+    },
+    {
+      id: "outbound-world",
+      title: "Outbound destinations worldwide",
+      render: (page: number, total: number) => <WorldMapSlide model={worldMapSlide(set)} page={page} total={total} />,
     },
     {
       id: "on-time-loading",

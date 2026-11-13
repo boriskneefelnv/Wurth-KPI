@@ -4,12 +4,14 @@ import { createRoot } from "react-dom/client";
 import type { ReportSet } from "../core/report/report";
 import { AssetsContext, type DeckAssets } from "../deck/assets";
 import { buildDeck } from "../deck/deck";
+import { FlagsContext, type DeckFlags } from "../deck/flags";
 import { Presentation } from "../deck/Presentation";
 
 export interface EmbeddedDeck {
   set: ReportSet;
   meetingDate: string;
   assets: DeckAssets;
+  flags?: DeckFlags;
 }
 
 declare global {
@@ -22,6 +24,8 @@ const deck = window.__DECK__;
 const slides = buildDeck(deck.set, new Date(`${deck.meetingDate}T12:00:00`));
 createRoot(document.getElementById("root")!).render(
   <AssetsContext.Provider value={deck.assets}>
-    <Presentation slides={slides} standalone />
+    <FlagsContext.Provider value={deck.flags ?? {}}>
+      <Presentation slides={slides} standalone />
+    </FlagsContext.Provider>
   </AssetsContext.Provider>,
 );

@@ -19,11 +19,7 @@ export function StorageSlide({ model, page, total }: { model: StorageSlideModel;
   const view = model.views[key];
   const over = view.groups[view.groups.length - 1]!;
   return (
-    <SlideShell title={model.title} subtitle={view.headline} page={page} total={total}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <PrincipalToggle options={model.order.map((k) => ({ key: k, label: model.views[k].label }))} selected={key} onSelect={setKey} />
-        <span style={{ fontSize: 11, color: T.textSecondary }}>HUs that left the warehouse in {model.period.label}, by days in storage</span>
-      </div>
+    <SlideShell title={model.title} topBar={<PrincipalToggle options={model.order.map((k) => ({ key: k, label: model.views[k].label }))} selected={key} onSelect={setKey} />} page={page} total={total}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
         <Card index={0} label="Average storage" value={view.avgDays} decimals unit="days" delta={view.avgDelta} deltaLabel={model.comparisonLabel} />
         <Card index={1} label="Median storage" value={view.medianDays} decimals whole unit="days" delta={view.medianDelta} deltaLabel={model.comparisonLabel} />

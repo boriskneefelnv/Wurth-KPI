@@ -8,6 +8,7 @@ import { computeOutbound, type OutboundBlock } from "./outbound";
 import { computeFlow, computeProfiles, type FlowBlock, type PrincipalProfile } from "./profiles";
 import { computeInboundStocked, computeOnTimeLoading, type PunctualityResult } from "./punctuality";
 import { computeStock, type StockBlock } from "./stock";
+import { computeOutboundCountries, type OutboundCountry } from "./countries";
 import { computeStorage, computeStorageDestinations, type StorageBlock, type StorageDestinationsBlock } from "./storage";
 import {
   computeContainerMix,
@@ -36,6 +37,7 @@ export interface OperationalReport {
   dailyVolume: DailyVolumeBlock;
   storage: StorageBlock;
   storageDestinations: StorageDestinationsBlock;
+  outboundCountries: OutboundCountry[];
   stock: StockBlock;
   flow: FlowBlock;
   profiles: Record<MainPrincipal, PrincipalProfile>;
@@ -70,6 +72,7 @@ export function computeReport(
     dailyVolume: computeDailyVolume(ctx),
     storage,
     storageDestinations: computeStorageDestinations(ctx),
+    outboundCountries: computeOutboundCountries(ctx),
     stock,
     flow: computeFlow(ctx),
     profiles,

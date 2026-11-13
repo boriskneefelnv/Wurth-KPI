@@ -193,6 +193,15 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B100 | Gemiddelden en verschillen altijd met één decimaal (17,2 days); medianen als heel getal wanneer ze heel zijn. |
 | B101 | De oude top-10 berekening (computeStorageTop) is vervangen door computeStorageDestinations per principal. |
 
+## Vlaggen, ritten, geen tekstregel, wereldkaart (13 nov)
+
+| # | Besluit |
+|---|---|
+| B102 | De tekstregel onder de titel is van alle slides verwijderd (op verzoek). De kopteksten blijven in het model voor later gebruik. Knoppen per principal staan nu in die band, links naast het Neele-Vat logo. |
+| B103 | Volumeslides: onder elke staaf het aantal ritten (inbound donker, outbound licht), ook in de tooltip. |
+| B104 | Vlaggen (country-flag-icons, 3:2) offline: de app laadt alleen de vlaggen van de landen in het rapport, de HTML-export bevat alleen die vlaggen als data: URI. |
+| B105 | Slide "Outbound destinations worldwide" (na werkdruk): landen gekleurd naar aantal ritten, de top 10 routes vanaf Rotterdam als bogen, top 10 met vlag, ritten en HU's; hover toont per principal. Kaart (world-atlas 110m) zit in de bundel, dus werkt zonder internet. Rangorde op ritten. Een rit naar twee landen telt voor beide. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

@@ -18,11 +18,7 @@ export function DailySlide({ model, page, total }: { model: DailySlideModel; pag
   const [key, setKey] = useState<DailyKey>("Total");
   const view = model.views[key];
   return (
-    <SlideShell title={model.title} subtitle={view.headline} page={page} total={total}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <PrincipalToggle options={model.order.map((k) => ({ key: k, label: model.views[k].label }))} selected={key} onSelect={setKey} />
-        <span style={{ fontSize: 11, color: T.textSecondary }}>HUs in and out per day in {model.period.label}, on the day of their ride</span>
-      </div>
+    <SlideShell title={model.title} topBar={<PrincipalToggle options={model.order.map((k) => ({ key: k, label: model.views[k].label }))} selected={key} onSelect={setKey} />} page={page} total={total}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
         <Card index={0} label="HUs per workday" value={view.avgPerWorkday?.total ?? null} sub={`${fmtInt(view.inbound.reduce((a, b) => a + b, 0) + view.outbound.reduce((a, b) => a + b, 0))} HUs in total`} delta={view.avgDeltaPct} deltaLabel={model.comparisonLabel} />
         <Card index={1} label="Inbound per workday" value={view.avgPerWorkday?.inbound ?? null} sub={perRide(view.inbound, view.inboundRides)} swatch={T.inbound} />
