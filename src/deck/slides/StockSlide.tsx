@@ -8,8 +8,8 @@ import { PrincipalToggle } from "../PrincipalToggle";
 import { SlideShell } from "../SlideShell";
 import { FONT, T } from "../tokens";
 
-const PRINCIPAL_BLUE: Record<MainPrincipal, string> = { WIAG: "#1E5478", AWKG: "#2A7AB0", "Liqui Moly": "#4FA0D4" };
-const glide = `height ${ANIM.switch}ms ease-out, bottom ${ANIM.switch}ms ease-out`;
+/** Stacked areas need clearly different colours (as in the original Würth module): Liqui Moly in green. */
+const PRINCIPAL_BLUE: Record<MainPrincipal, string> = { WIAG: "#1E5478", AWKG: "#4FA0D4", "Liqui Moly": "#7DB73E" };
 
 /**
  * Stock: average HUs in stock per month (end of each day, averaged), stacked
@@ -87,7 +87,7 @@ function Delta({ pct, label }: { pct: number; label: string }) {
 }
 
 function niceMax(raw: number): { max: number; ticks: number[] } {
-  const target = Math.max(4, raw) * 1.15;
+  const target = Math.max(4, raw) * 1.12;
   const mag = Math.pow(10, Math.floor(Math.log10(target)));
   const norm = target / mag;
   const step = (norm <= 1 ? 0.25 : norm <= 2 ? 0.5 : norm <= 5 ? 1 : 2) * mag;
@@ -95,108 +95,142 @@ function niceMax(raw: number): { max: number; ticks: number[] } {
   return { max, ticks: [0, max / 4, max / 2, (max * 3) / 4, max] };
 }
 
+/** Smooth line through the points without overshoot (monotone cubic). */
+function smooth(pts: [number, number][]): string {
+  const n = pts.length;
+  if (n === 0) return "";
+  if (n === 1) return `M${pts[0]![0]},${pts[0]![1]}`;
+  const dx = pts.slice(1).map((p, i) => p[0] - pts[i]![0]);
+  const sl = pts.slice(1).map((p, i) => (p[1] - pts[i]![1]) / dx[i]!);
+  const m = pts.map((_, i) => (i === 0 ? sl[0]! : i === n - 1 ? sl[n - 2]! : sl[i - 1]! * sl[i]! <= 0 ? 0 : (sl[i - 1]! + sl[i]!) / 2));
+  for (let i = 0; i < n - 1; i++) {
+    if (sl[i] === 0) {
+      m[i] = 0;
+      m[i + 1] = 0;
+      continue;
+    }
+    const a = m[i]! / sl[i]!;
+    const b = m[i + 1]! / sl[i]!;
+    const t = a * a + b * b;
+    if (t > 9) {
+      const k = 3 / Math.sqrt(t);
+      m[i] = k * a * sl[i]!;
+      m[i + 1] = k * b * sl[i]!;
+    }
+  }
+  let d = `M${pts[0]![0].toFixed(1)},${pts[0]![1].toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const [x0, y0] = pts[i]!;
+    const [x1, y1] = pts[i + 1]!;
+    const h = dx[i]! / 3;
+    d += `C${(x0 + h).toFixed(1)},${(y0 + m[i]! * h).toFixed(1)} ${(x1 - h).toFixed(1)},${(y1 - m[i + 1]! * h).toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
+  }
+  return d;
+}
+
+const LAYERS: MainPrincipal[] = ["WIAG", "AWKG", "Liqui Moly"];
+
 function Chart({ model, view }: { model: StockSlideModel; view: StockView }) {
   const animate = useAnimate();
   const [hover, setHover] = useState<number | null>(null);
-  const n = view.buckets.length;
-  const { max, ticks } = niceMax(Math.max(...view.buckets.map((b) => Math.max(b.avg, b.ghost ?? 0))));
-  const PLOT_H = 300;
-  const Y_W = 52;
-  const barW = n <= 4 ? 64 : n <= 7 ? 56 : n <= 10 ? 44 : 28;
+  const pts = model.points;
+  const n = pts.length;
+  const layers = view.key === "Total" ? LAYERS : [view.key as MainPrincipal];
+  const totals = pts.map((p) => layers.reduce((a, l) => a + p.parts[l], 0));
+  const ghosts = pts.map((p) => p.ghost[view.key]);
+  const { max, ticks } = niceMax(Math.max(...totals, ...ghosts.map((g) => g ?? 0)));
+  const W = 1076;
+  const H = 300;
+  const PAD = n > 1 ? 34 : W / 2;
+  const x = (i: number) => (n > 1 ? PAD + (i * (W - 2 * PAD)) / (n - 1) : W / 2);
+  const y = (v: number) => H - (v / max) * H;
   const showValues = n <= 13;
-  const h = (v: number) => (v > 0 ? Math.max(1, (v / max) * PLOT_H) : 0);
-  const stacked = view.buckets.some((b) => b.parts);
-  const showGhost = view.buckets.some((b) => b.ghost !== null);
+  const step = n > 1 ? (W - 2 * PAD) / (n - 1) : W;
+  const everyLabel = Math.max(1, Math.ceil(n / 14));
+
+  // Stacked areas, bottom layer first.
+  const cum: number[][] = [];
+  layers.forEach((l, k) => cum.push(pts.map((p, i) => (k ? cum[k - 1]![i]! : 0) + p.parts[l])));
+  const areas = layers.map((l, k) => {
+    const top = smooth(cum[k]!.map((v, i) => [x(i), y(v)]));
+    const bottomPts = (k ? cum[k - 1]! : pts.map(() => 0)).map((v, i) => [x(i), y(v)] as [number, number]).reverse();
+    const bottom = smooth(bottomPts).replace(/^M/, "L");
+    return { l, area: `${top}${bottom}Z`, line: top };
+  });
+  const ghostPts = ghosts.map((g, i) => (g === null ? null : ([x(i), y(g)] as [number, number])));
+  const ghostLine = ghostPts.every((p) => p !== null) && n > 1 ? smooth(ghostPts as [number, number][]) : null;
+  const morph = `d ${ANIM.switch}ms ease-out`;
 
   return (
     <div style={{ flex: 1, minHeight: 0, background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "14px 22px 10px", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: T.textSecondary }}>{model.per} · average HUs in stock</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: T.textSecondary }}>Average HUs in stock {model.pointUnit}</div>
         <div style={{ display: "flex", gap: 16, fontSize: 11, fontWeight: 500, color: T.heroText }}>
-          {stacked ? (
-            (Object.keys(PRINCIPAL_BLUE) as MainPrincipal[]).map((p) => <Legend key={p} el={<span style={{ width: 11, height: 11, borderRadius: 2, background: PRINCIPAL_BLUE[p] }} />} label={p} />)
-          ) : (
-            <Legend el={<span style={{ width: 11, height: 11, borderRadius: 2, background: T.bluePrimary }} />} label="Average stock" />
-          )}
-          {showGhost && model.ghostLabel && <Legend el={<span style={{ width: 14, height: 2, background: T.heroText }} />} label={model.ghostLabel} />}
+          {layers.map((p) => (
+            <Legend key={p} el={<span style={{ width: 11, height: 11, borderRadius: 2, background: PRINCIPAL_BLUE[p] }} />} label={p} />
+          ))}
+          {ghostLine && model.ghostLabel && <Legend el={<span style={{ width: 16, borderTop: `2px dashed ${T.heroText}` }} />} label={model.ghostLabel} />}
         </div>
       </div>
       <div style={{ display: "flex" }}>
-        <div style={{ width: Y_W, position: "relative", height: PLOT_H }}>
+        <div style={{ width: 52, position: "relative", height: H }}>
           {ticks.map((t) => (
-            <div key={t} style={{ position: "absolute", right: 10, top: PLOT_H - (t / max) * PLOT_H - 6, fontSize: 10, color: T.axis, fontVariantNumeric: "tabular-nums" }}>
+            <div key={t} style={{ position: "absolute", right: 10, top: y(t) - 6, fontSize: 10, color: T.axis, fontVariantNumeric: "tabular-nums" }}>
               {fmtInt(t)}
             </div>
           ))}
         </div>
-        <div style={{ flex: 1, position: "relative" }}>
-          <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: PLOT_H }}>
+        <div style={{ position: "relative", width: W }} onMouseLeave={() => setHover(null)}>
+          <svg width={W} height={H} style={{ display: "block", overflow: "visible" }}>
             {ticks.map((t) => (
-              <div key={t} style={{ position: "absolute", left: 0, right: 0, top: PLOT_H - (t / max) * PLOT_H, borderTop: `1px dashed ${T.gridline}`, opacity: t === 0 ? 1 : 0.55 }} />
+              <line key={t} x1={0} x2={W} y1={y(t)} y2={y(t)} stroke={T.gridline} strokeDasharray="3 4" opacity={t === 0 ? 1 : 0.55} />
             ))}
-          </div>
-          <div style={{ position: "relative", height: PLOT_H, display: "flex", justifyContent: "space-around", alignItems: "flex-end", padding: "0 8px" }}>
-            {view.buckets.map((b, i) => {
-              const delay = i * ANIM.barStagger;
-              const parts = b.parts ?? [{ principal: null, avg: b.avg }];
-              let base = 0;
-              return (
-                <div key={b.key} style={{ position: "relative", width: barW, height: PLOT_H }} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-                  <div style={{ position: "absolute", left: 0, bottom: 0, width: barW, height: PLOT_H, transformOrigin: "bottom", ...(animate ? { transform: "scaleY(0)", animation: `deckBarGrow ${ANIM.barGrow}ms ${delay}ms ease-out forwards` } : {}) }}>
-                    {parts.map((p, k) => {
-                      const bottom = h(base);
-                      base += p.avg;
-                      return (
-                        <div
-                          key={p.principal ?? k}
-                          style={{
-                            position: "absolute",
-                            left: 0,
-                            width: barW,
-                            bottom,
-                            height: h(base) - bottom,
-                            background: p.principal ? PRINCIPAL_BLUE[p.principal] : T.bluePrimary,
-                            borderTopLeftRadius: k === parts.length - 1 ? 2 : 0,
-                            borderTopRightRadius: k === parts.length - 1 ? 2 : 0,
-                            transition: glide,
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                  {b.ghost !== null && (
-                    <div style={{ position: "absolute", left: -4, width: barW + 8, bottom: h(b.ghost) - 1, height: 2, background: T.heroText, opacity: 0.75, transition: glide, ...entry(animate, "deckFadeIn", 250, delay + ANIM.markerDelay) }} />
-                  )}
-                  {showValues && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: Math.max(h(b.avg), b.ghost !== null ? h(b.ghost) : 0) + 5,
-                        left: barW / 2 - 30,
-                        width: 60,
-                        textAlign: "center",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: T.heroText,
-                        fontVariantNumeric: "tabular-nums",
-                        transition: glide,
-                        ...entry(animate, "deckFadeIn", ANIM.labelIn, delay + ANIM.barGrow),
-                      }}
-                    >
-                      {fmtInt(b.avg)}
-                    </div>
-                  )}
-                  {hover === i && <Tip model={model} b={b} barW={barW} bottom={Math.min(PLOT_H - 90, h(b.avg) + 26)} />}
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-around", padding: "0 8px", marginTop: 8 }}>
-            {view.buckets.map((b) => (
-              <div key={b.key} style={{ width: barW, textAlign: "center", fontSize: 12, fontWeight: 500, color: T.heroText, whiteSpace: "nowrap" }}>
-                {b.label}
+            <g style={animate ? { clipPath: "inset(0 100% 0 0)", animation: `deckReveal 900ms 150ms ease-out forwards` } : undefined}>
+              {areas.map((a) => (
+                <g key={a.l}>
+                  <path d={a.area} fill={PRINCIPAL_BLUE[a.l]} fillOpacity={0.78} style={{ transition: morph }} />
+                  <path d={a.line} fill="none" stroke={PRINCIPAL_BLUE[a.l]} strokeWidth={1.6} style={{ transition: morph }} />
+                </g>
+              ))}
+              {ghostLine && <path d={ghostLine} fill="none" stroke={T.heroText} strokeWidth={1.6} strokeDasharray="5 4" opacity={0.8} style={{ transition: morph }} />}
+              {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={0} y2={H} stroke={T.heroText} strokeOpacity={0.35} />}
+              {hover !== null &&
+                cum.map((c, k) => <circle key={k} cx={x(hover)} cy={y(c[hover]!)} r={3.5} fill="#fff" stroke={PRINCIPAL_BLUE[layers[k]!]} strokeWidth={2} />)}
+            </g>
+          </svg>
+          {showValues &&
+            totals.map((t, i) => (
+              <div
+                key={pts[i]!.key}
+                style={{
+                  position: "absolute",
+                  left: x(i) - 30,
+                  width: 60,
+                  top: Math.min(y(t), ghosts[i] !== null ? y(ghosts[i]!) : H) - 20,
+                  textAlign: "center",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: T.heroText,
+                  fontVariantNumeric: "tabular-nums",
+                  transition: `top ${ANIM.switch}ms ease-out`,
+                  ...entry(animate, "deckFadeIn", ANIM.labelIn, 900),
+                }}
+              >
+                {fmtInt(t)}
               </div>
             ))}
+          {pts.map((p, i) => (
+            <div key={p.key} style={{ position: "absolute", top: 0, height: H, left: x(i) - step / 2, width: step }} onMouseEnter={() => setHover(i)} />
+          ))}
+          {hover !== null && <Tip model={model} view={view} i={hover} left={x(hover)} layers={layers} />}
+          <div style={{ position: "relative", height: 18, marginTop: 8 }}>
+            {pts.map((p, i) =>
+              i % everyLabel === 0 ? (
+                <div key={p.key} style={{ position: "absolute", left: x(i) - 40, width: 80, textAlign: "center", fontSize: 12, fontWeight: 500, color: T.heroText, whiteSpace: "nowrap" }}>
+                  {p.label}
+                </div>
+              ) : null,
+            )}
           </div>
         </div>
       </div>
@@ -204,15 +238,17 @@ function Chart({ model, view }: { model: StockSlideModel; view: StockView }) {
   );
 }
 
-function Tip({ model, b, barW, bottom }: { model: StockSlideModel; b: StockView["buckets"][number]; barW: number; bottom: number }) {
-  const rows: [string, number][] = [["Average stock", b.avg], ...(b.parts ?? []).map((p) => [p.principal, p.avg] as [string, number])];
-  if (b.ghost !== null && model.ghostLabel) rows.push([model.ghostLabel, b.ghost]);
+function Tip({ model, view, i, left, layers }: { model: StockSlideModel; view: StockView; i: number; left: number; layers: MainPrincipal[] }) {
+  const p = model.points[i]!;
+  const total = layers.reduce((a, l) => a + p.parts[l], 0);
+  const rows: [string, number][] = layers.length > 1 ? [...layers].reverse().map((l) => [l, p.parts[l]] as [string, number]) : [];
+  const ghost = p.ghost[view.key];
   return (
     <div
       style={{
         position: "absolute",
-        left: barW / 2 - 100,
-        bottom,
+        left: Math.min(Math.max(0, left + 14), 1076 - 210),
+        top: 10,
         width: 200,
         zIndex: 20,
         background: "#fff",
@@ -225,13 +261,23 @@ function Tip({ model, b, barW, bottom }: { model: StockSlideModel; b: StockView[
         pointerEvents: "none",
       }}
     >
-      <div style={{ fontWeight: 700, marginBottom: 4 }}>{b.label}</div>
-      {rows.map(([name, v], i) => (
-        <div key={name} style={{ display: "flex", justifyContent: "space-between", color: i === 0 ? T.heroText : T.textSecondary }}>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>{p.label}</div>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <span>Average stock</span>
+        <strong style={{ fontVariantNumeric: "tabular-nums" }}>{fmtInt(total)} HUs</strong>
+      </div>
+      {rows.map(([name, v]) => (
+        <div key={name} style={{ display: "flex", justifyContent: "space-between", color: T.textSecondary }}>
           <span>{name}</span>
-          <strong style={{ fontVariantNumeric: "tabular-nums", fontWeight: i === 0 ? 700 : 500 }}>{fmtInt(v)} HUs</strong>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmtInt(v)}</span>
         </div>
       ))}
+      {ghost !== null && model.ghostLabel && (
+        <div style={{ display: "flex", justifyContent: "space-between", color: T.textSecondary, borderTop: `1px solid ${T.borderSubtle}`, marginTop: 4, paddingTop: 3 }}>
+          <span>{p.label} last year</span>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmtInt(ghost)}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { ReportPeriod } from "../period";
+import { eachDay, isoWeek, MONTHS_EN, type ReportPeriod } from "../period";
 import { deltaPct } from "../report/context";
 import type { ReportSet } from "../report/report";
 import type { StockKey } from "../report/stock";
@@ -31,6 +31,17 @@ export interface StockView {
   }[];
 }
 
+/** A point of the stock curve: the average over a stretch of days. */
+export interface StockPoint {
+  key: string;
+  label: string;
+  /** Average stock per principal over the stretch (the curve is stacked). */
+  parts: Record<MainPrincipal, number>;
+  total: number;
+  /** Same month last year, per view (only for monthly points of aligned periods). */
+  ghost: Record<StockKey, number | null>;
+}
+
 export interface StockSlideModel {
   title: string;
   period: ReportPeriod;
@@ -39,6 +50,10 @@ export interface StockSlideModel {
   per: string;
   views: Record<StockKey, StockView>;
   order: StockKey[];
+  /** Curve points: per day (week or month report), per week (quarter) or per month (longer). */
+  points: StockPoint[];
+  /** "per day", "per week" or "per month", for the chart title. */
+  pointUnit: string;
 }
 
 const ORDER: StockKey[] = ["Total", "WIAG", "AWKG", "Liqui Moly"];
@@ -73,7 +88,38 @@ export function stockSlide(set: ReportSet): StockSlideModel {
     }),
   ) as Record<StockKey, StockView>;
 
+  // Points: stretches of days, averaged. Monthly averages as asked; shorter
+  // reports use weeks or days so the curve still has shape.
+  const days = eachDay(period);
+  const unit: "day" | "week" | "month" = days.length <= 31 ? "day" : days.length <= 92 ? "week" : "month";
+  const groups: { key: string; label: string; idx: number[] }[] = [];
+  days.forEach((d, i) => {
+    const key = unit === "day" ? d : unit === "week" ? `${isoWeek(d).year}-W${isoWeek(d).week}` : d.slice(0, 7);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.idx.push(i);
+    else groups.push({ key, label: unit === "day" ? `${Number(d.slice(8))} ${MONTHS_EN[Number(d.slice(5, 7)) - 1]}` : unit === "week" ? `Wk ${isoWeek(d).week}` : MONTHS_EN[Number(d.slice(5, 7)) - 1]!, idx: [i] });
+  });
+  const mean = (xs: number[], idx: number[]) => idx.reduce((a, i) => a + (xs[i] ?? 0), 0) / idx.length;
+  const prevAvg = primary && aligned ? primary.report.stock.average : null;
+  const prevDays = primary ? eachDay(primary.report.period) : [];
+  const points: StockPoint[] = groups.map((g) => {
+    const parts = Object.fromEntries(MAIN_PRINCIPALS.map((p) => [p, mean(cur[p].daily, g.idx)])) as Record<MainPrincipal, number>;
+    const ghost = Object.fromEntries(ORDER.map((k) => [k, null])) as Record<StockKey, number | null>;
+    if (prevAvg && unit === "month") {
+      // The same month last year (aligned periods have the same months).
+      const m = g.key.slice(5);
+      const pi = prevDays.map((d, i) => (d.slice(5, 7) === m ? i : -1)).filter((i) => i >= 0);
+      for (const k of ORDER) {
+        const v = pi.length ? mean(prevAvg[k].daily, pi) : 0;
+        ghost[k] = v > 0 ? v : null;
+      }
+    }
+    return { key: g.key, label: g.label, parts, total: mean(cur.Total.daily, g.idx), ghost };
+  });
+
   return {
+    points,
+    pointUnit: `per ${unit}`,
     title: "Stock",
     period,
     comparisonLabel: primary ? `vs ${primary.report.period.label}` : null,

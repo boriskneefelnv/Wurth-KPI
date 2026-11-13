@@ -36,6 +36,8 @@ export interface StockAverage {
   peak: { day: DayKey; hus: number } | null;
   /** Stock at the end of the period. */
   end: number;
+  /** End-of-day stock for every day of the period (same order as the period's days). */
+  daily: number[];
 }
 
 /** In stock at `at` ⇔ inbound ≤ at and (no outbound or outbound > at). */
@@ -128,7 +130,7 @@ export function averageStock(ctx: ReportContext): Record<StockKey, StockAverage>
         const xs = series.filter((_, i) => bucketIndex([b], days[i]!) === 0);
         return { key: b.key, label: b.label, avg: xs.length ? xs.reduce((a, x) => a + x, 0) / xs.length : 0 };
       });
-      const avg: StockAverage = { avg: series.reduce((a, x) => a + x, 0) / series.length, perBucket, peak, end: series[series.length - 1]! };
+      const avg: StockAverage = { avg: series.reduce((a, x) => a + x, 0) / series.length, perBucket, peak, end: series[series.length - 1]!, daily: series };
       return [k, avg];
     }),
   ) as Record<StockKey, StockAverage>;

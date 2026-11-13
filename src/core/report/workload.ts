@@ -4,7 +4,7 @@ import { bucketIndex, type TrendBucket } from "../period";
 import { directionalDate } from "../wms/rides";
 import type { DayKey, Direction, KnownShipmentType, Perspective, Principal, ShipmentType, WmsUnit } from "../types";
 import { KNOWN_SHIPMENT_TYPES, PRINCIPALS } from "../types";
-import { inc, selectedRides, type ReportContext } from "./context";
+import { dominantPrincipal, inc, selectedRides, type ReportContext } from "./context";
 
 // ---------------------------------------------------------------------------
 // Volume
@@ -137,11 +137,14 @@ export interface ContainerMixBlock {
   perspective: Perspective;
   total: ContainerMix;
   perPrincipal: Record<Principal, ContainerMix>;
+  /** Rides only: the total split by the ride's main principal, so the parts add up to the total. */
+  totalByPrincipal: Record<Principal, Record<ShipmentType, number>> | null;
 }
 
 export function computeContainerMix(ctx: ReportContext, perspective: Perspective): ContainerMixBlock {
   const total = emptyCounts();
   const per = Object.fromEntries(PRINCIPALS.map((p) => [p, emptyCounts()])) as Record<Principal, Record<ShipmentType, number>>;
+  let byMain: Record<Principal, Record<ShipmentType, number>> | null = null;
 
   if (perspective === "hus") {
     for (const u of ctx.units) {
@@ -151,9 +154,11 @@ export function computeContainerMix(ctx: ReportContext, perspective: Perspective
       per[u.principal][t]++;
     }
   } else {
+    byMain = Object.fromEntries(PRINCIPALS.map((p) => [p, emptyCounts()])) as Record<Principal, Record<ShipmentType, number>>;
     for (const ride of selectedRides(ctx, "outbound")) {
       const units = ctx.unitsByRide.outbound.get(ride.ritNummer) ?? [];
       total[dominantType(units)]++;
+      byMain[dominantPrincipal(ride)][dominantType(units)]++;
       for (const p of ride.principals) per[p][dominantType(units.filter((u) => u.principal === p))]++;
     }
   }
@@ -161,6 +166,7 @@ export function computeContainerMix(ctx: ReportContext, perspective: Perspective
     perspective,
     total: finishMix(total),
     perPrincipal: Object.fromEntries(PRINCIPALS.map((p) => [p, finishMix(per[p])])) as Record<Principal, ContainerMix>,
+    totalByPrincipal: byMain,
   };
 }
 

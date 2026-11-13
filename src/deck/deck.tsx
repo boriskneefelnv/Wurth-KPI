@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { ReportSet } from "../core/report/report";
+import { containerMixSlide } from "../core/slides/containerMix";
 import { dailySlide } from "../core/slides/daily";
 import { punctualitySlide } from "../core/slides/punctuality";
 import { destinationsSlide } from "../core/slides/destinations";
@@ -13,6 +14,7 @@ import { StorageSlide } from "./slides/StorageSlide";
 import { DestinationsSlide } from "./slides/DestinationsSlide";
 import { WorldMapSlide } from "./slides/WorldMapSlide";
 import { ClosingSlide } from "./slides/ClosingSlide";
+import { ContainerMixSlide } from "./slides/ContainerMixSlide";
 import { DailySlide } from "./slides/DailySlide";
 import { CoverSlide } from "./slides/CoverSlide";
 import { DividerSlide } from "./slides/DividerSlide";
@@ -77,6 +79,11 @@ export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
       id: "daily-workload",
       title: "Daily workload",
       render: (page: number, total: number) => <DailySlide model={dailySlide(set)} page={page} total={total} />,
+    },
+    {
+      id: "container-mix",
+      title: "Container mix",
+      render: (page: number, total: number) => <ContainerMixSlide model={containerMixSlide(set)} page={page} total={total} />,
     },
     {
       id: "outbound-world",

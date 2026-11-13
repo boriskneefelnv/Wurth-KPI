@@ -217,6 +217,13 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B109 | Gecontroleerd op de data: HU's zonder uitslag zijn vrijwel allemaal recent ingeslagen (okt/nov 2026), er is geen "spookvoorraad" van oude HU's. Voorraad hangt af van eerdere inslag, dus het unitoverzicht moet de marge van 4 maanden vóór de periode hebben (al zo ingericht). |
 | B110 | Slide "Stock" in sectie 02: gemiddelde voorraad (verschil met vorig jaar, neutrale kleur), voorraad aan het eind van de periode, hoogste stand, en voorraad in werkdagen (gemiddelde voorraad / uitgaande HU's per werkdag). Bij alle principals gestapeld per principal; knoppen per principal; vorig jaar als streep (alleen voor maanden met voorraad). |
 
+## Voorraad als vlakgrafiek, containermix (13 nov)
+
+| # | Besluit |
+|---|---|
+| B111 | Voorraad als gestapelde vlakgrafiek zoals in de Lovable-module (op verzoek), met de nieuwe berekening: punten = gemiddelde voorraad per maand (kwartaal: per week, week of maand: per dag), vorig jaar als stippellijn, hover per punt. Liqui Moly groen, AWKG lichtblauw, WIAG donkerblauw zodat de lagen te onderscheiden zijn. |
+| B112 | Containermix in ritten (containers), op verzoek. Per containersoort een liggende staaf; bij alle principals opgedeeld naar de hoofdprincipal van de rit (zodat de delen optellen tot het totaal), vorig jaar als streep. Kaarten: containers uit (met verschil), TEU (20ft = 1, 40ft = 2), aandeel volle containers en LCL. Soorten zonder ritten worden weggelaten. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.
