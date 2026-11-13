@@ -8,8 +8,11 @@ import { PrincipalToggle } from "../PrincipalToggle";
 import { SlideShell } from "../SlideShell";
 import { FONT, T } from "../tokens";
 
-const ORIGIN = { sales: "#2A7AB0", vendor: "#1E5478", unassessed: "#B8C4D0" } as const;
-const VERDICT = { accepted: "#D4884A", open: "#7F9BB5", denied: "#DCE3EA" } as const;
+/** Not assessed yet: striped yellow everywhere, so it is clear the assessment is still to be done. */
+const PENDING = "repeating-linear-gradient(135deg, #E9B949 0 4px, #FCEBB6 4px 8px)";
+const ORIGIN = { sales: "#2A7AB0", vendor: "#1E5478", unassessed: PENDING } as const;
+const VERDICT = { accepted: "#D4884A", open: PENDING, denied: "#DCE3EA" } as const;
+const PENDING_BADGE = { background: "#FFF6D6", color: "#8A6100", boxShadow: "inset 0 0 0 1px #E9B949" } as const;
 const BELOW = "#B5652B";
 
 function useView(model: ComplaintsSlideModel) {
@@ -26,8 +29,14 @@ export function ComplaintsOverviewSlide({ model, page, total }: { model: Complai
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
         <PctCard index={0} label="Rides without complaint" level={view.rides} target={model.target} unit="rides" deltaLabel={model.comparisonLabel} />
         <PctCard index={1} label="HUs without complaint" level={view.hus} target={model.target} unit="HUs" deltaLabel={model.comparisonLabel} />
-        <CountCard index={2} label="Complaints" value={view.counted} sub={[view.warehouse ? `${view.warehouse} in the warehouse` : null, view.denied ? `${view.denied} denied, not counted` : null].filter(Boolean).join(" · ") || "Not denied"} />
-        <CountCard index={3} label="Pallets affected" value={view.palletsAffected} sub={view.open ? `${view.open} not assessed yet` : "In complaints that count"} />
+        <CountCard
+          index={2}
+          label="Complaints"
+          value={view.counted}
+          sub={[view.warehouse ? `${view.warehouse} in the warehouse` : null, view.denied ? `${view.denied} denied, not counted` : null].filter(Boolean).join(" · ") || "Not denied"}
+          badge={view.open ? `${view.open} not assessed yet` : null}
+        />
+        <CountCard index={3} label="Pallets affected" value={view.palletsAffected} sub="In complaints that count" />
       </div>
       <PerMonth model={model} view={view} />
     </SlideShell>
@@ -91,7 +100,8 @@ function PctCard({ index, label, level, target, unit, deltaLabel }: { index: num
   );
 }
 
-function CountCard({ index, label, value, sub }: { index: number; label: string; value: number; sub: string }) {
+function CountCard({ index, label, value, sub, badge }: { index: number; label: string; value: number; sub: string; badge?: string | null }) {
+  const animate = useAnimate();
   const n = useTweenNumber(value, ANIM.count, index * ANIM.cardStagger);
   return (
     <Shell index={index}>
@@ -99,6 +109,11 @@ function CountCard({ index, label, value, sub }: { index: number; label: string;
         <div style={cap}>{label}</div>
         <div style={{ fontSize: 30, fontWeight: 700, color: T.heroText, lineHeight: 1.05, marginTop: 5, fontVariantNumeric: "tabular-nums" }}>{fmtInt(n)}</div>
         <div style={{ fontSize: 11, color: T.textSecondary, marginTop: 4, whiteSpace: "nowrap" }}>{sub}</div>
+        {badge && (
+          <div style={{ marginTop: 6, ...entry(animate, "deckFadeIn", ANIM.badgeIn, ANIM.badgeDelay) }}>
+            <span style={{ display: "inline-flex", padding: "2px 8px", borderRadius: 10, fontSize: 10.5, fontWeight: 600, whiteSpace: "nowrap", ...PENDING_BADGE }}>{badge}</span>
+          </div>
+        )}
       </div>
     </Shell>
   );
@@ -107,7 +122,7 @@ function CountCard({ index, label, value, sub }: { index: number; label: string;
 function Legend({ color, label, line }: { color: string; label: string; line?: boolean }) {
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      {line ? <span style={{ width: 16, borderTop: `2px dashed ${color}` }} /> : <span style={{ width: 11, height: 11, borderRadius: 2, background: color }} />}
+      {line ? <span style={{ width: 16, borderTop: `2px dashed ${color}` }} /> : <span style={{ width: 11, height: 11, borderRadius: 2, background: color, boxShadow: color === PENDING ? "inset 0 0 0 1px #E9B949" : undefined }} />}
       {label}
     </span>
   );
@@ -289,7 +304,7 @@ function Latest({ view }: { view: ComplaintsView }) {
           <span style={{ fontVariantNumeric: "tabular-nums", color: T.textSecondary }}>{`${c.day.slice(8)}-${c.day.slice(5, 7)}`}</span>
           <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{c.principal ?? ""}</span>
           <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cleanSubject(c.subject)}</span>
-          <span style={{ justifySelf: "end", padding: "2px 8px", borderRadius: 10, fontSize: 10.5, fontWeight: 600, whiteSpace: "nowrap", background: c.verdict === "accepted" ? "#FBEFE4" : c.verdict === "denied" ? "#EEF2F6" : "#F1F4F8", color: c.verdict === "accepted" ? BELOW : "#475569" }}>
+          <span style={{ justifySelf: "end", padding: "2px 8px", borderRadius: 10, fontSize: 10.5, fontWeight: 600, whiteSpace: "nowrap", ...(c.verdict === "open" ? PENDING_BADGE : { background: c.verdict === "accepted" ? "#FBEFE4" : "#EEF2F6", color: c.verdict === "accepted" ? BELOW : "#475569" }) }}>
             {VERDICT_LABEL[c.verdict]}
           </span>
         </div>
