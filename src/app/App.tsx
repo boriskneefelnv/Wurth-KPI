@@ -21,6 +21,9 @@ import { inlineAssets, interactiveDeckDocument, renderSlidesStatic } from "../de
 import { Presentation } from "../deck/Presentation";
 import { flagCodes, FlagsContext, type DeckFlags } from "../deck/flags";
 import { loadFlags } from "../deck/loadFlags";
+import { FocusContext } from "../deck/focus";
+import { focusOn } from "../core/report/focus";
+import { MAIN_PRINCIPALS, type MainPrincipal } from "../core/types";
 import { SLIDE_H, SLIDE_W } from "../deck/tokens";
 import { buildControlListXlsx } from "./controlList";
 import type { Dataset, FileInfo } from "./load";
@@ -44,6 +47,7 @@ function defaultRange(): DisplayRange {
   return { from: ym(start), to: ym(end), previous: true, lastYear: true };
 }
 const RANGE_KEY = "wurth-kpi-range";
+const FOCUS_KEY = "wurth-kpi-focus";
 function loadRange(): DisplayRange {
   try {
     const r = JSON.parse(localStorage.getItem(RANGE_KEY) ?? "null") as DisplayRange | null;
@@ -85,6 +89,24 @@ export function App() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<DisplayRange>(loadRange);
+  // The entity the deck is for (null = all), remembered on this computer.
+  const [focus, setFocus] = useState<MainPrincipal | null>(() => {
+    try {
+      const v = localStorage.getItem(FOCUS_KEY);
+      return (MAIN_PRINCIPALS as readonly string[]).includes(v ?? "") ? (v as MainPrincipal) : null;
+    } catch {
+      return null;
+    }
+  });
+  function updateFocus(f: MainPrincipal | null) {
+    setFocus(f);
+    try {
+      if (f) localStorage.setItem(FOCUS_KEY, f);
+      else localStorage.removeItem(FOCUS_KEY);
+    } catch {
+      /* no storage */
+    }
+  }
   useEffect(() => saveRange(range), [range]);
   const updateRange = (patch: Partial<DisplayRange>) =>
     setRange((r) => {
@@ -178,13 +200,15 @@ export function App() {
   const usable = options.filter((o) => o.usable && chosen.includes(o.kind)).map((o) => o.kind);
   const periodOk = period && quality ? quality(period) : null;
 
+  // One entity: the whole deck is computed from its HUs and rides only.
   const reportSet = useMemo(() => {
     if (!period || !dataset || !base) return null;
-    return computeReportSet(dataset.units, period, usable, {}, base.rides);
+    const data = focus ? focusOn(dataset.units, base.rides, focus) : { units: dataset.units, rides: base.rides };
+    return computeReportSet(data.units, period, usable, {}, data.rides);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, dataset, base, usable.join(",")]);
+  }, [period, dataset, base, usable.join(","), focus]);
   const slides: SlideDef[] = useMemo(
-    () => (reportSet ? buildDeck(reportSet, new Date(`${meetingDate}T12:00:00`)) : []),
+    () => (reportSet ? buildDeck(reportSet, new Date(`${meetingDate}T12:00:00`), focus) : []),
     [reportSet, meetingDate],
   );
 
@@ -255,9 +279,9 @@ export function App() {
     const runtime = await (await fetch(`${import.meta.env.BASE_URL}runtime/present.js`)).text();
     return interactiveDeckDocument({
       runtime,
-      data: { set: reportSet, meetingDate, assets, flags },
-      printSlides: renderSlidesStatic(slides, assets, flags),
-      title: `QBR Würth ${reportSet.current.period.label}`,
+      data: { set: reportSet, meetingDate, assets, flags, focus },
+      printSlides: renderSlidesStatic(slides, assets, flags, focus),
+      title: `QBR Würth ${focus ? `${focus} ` : ""}${reportSet.current.period.label}`,
     });
   }
 
@@ -265,7 +289,7 @@ export function App() {
     if (!period) return;
     setExporting(true);
     try {
-      download(`QBR Wurth ${period.label}.html`, await standaloneDeck(), "text/html");
+      download(`QBR Wurth ${focus ? `${focus} ` : ""}${period.label}.html`, await standaloneDeck(), "text/html");
     } finally {
       setExporting(false);
     }
@@ -287,6 +311,7 @@ export function App() {
 
   return (
     <FlagsContext.Provider value={flags}>
+    <FocusContext.Provider value={focus}>
     <div className="app">
       <header className="top">
         <img className="brand-logo" src={`${import.meta.env.BASE_URL}brand/neelevat-maasvlakte-blue.png`} alt="Neele-Vat Maasvlakte" />
@@ -304,6 +329,17 @@ export function App() {
           <label>
             t/m
             <input type="month" value={range.to} min={range.from} onChange={(e) => e.target.value && updateRange({ to: e.target.value })} />
+          </label>
+          <label>
+            Entiteit
+            <select value={focus ?? ""} onChange={(e) => updateFocus((e.target.value || null) as MainPrincipal | null)}>
+              <option value="">Alle</option>
+              {MAIN_PRINCIPALS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
           </label>
           <fieldset>
             <legend>Vergelijken met</legend>
@@ -525,6 +561,7 @@ export function App() {
       )}
       {presenting !== null && slides.length > 0 && <Presentation slides={slides} start={presenting} onClose={() => setPresenting(null)} />}
     </div>
+    </FocusContext.Provider>
     </FlagsContext.Provider>
   );
 }

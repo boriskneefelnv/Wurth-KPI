@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { ReportSet } from "../core/report/report";
+import type { MainPrincipal } from "../core/types";
 import { containerMixSlide } from "../core/slides/containerMix";
 import { dailySlide } from "../core/slides/daily";
 import { punctualitySlide } from "../core/slides/punctuality";
@@ -46,33 +47,41 @@ export function longDate(d: Date): string {
  * The deck, in presentation order. Slides are added here one by one as they
  * are rebuilt on the new calculations.
  */
-export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
+/**
+ * `focus`: a deck for one entity. The report set must then already be
+ * narrowed to it (core/report/focus.ts); the deck shows one volume slide and
+ * the slides render with FocusContext set (see deck/focus.tsx).
+ */
+export function buildDeck(set: ReportSet, meetingDate: Date, focus: MainPrincipal | null = null): SlideDef[] {
   const p = set.current.period;
-  const footer = `QBR Neele-Vat × Würth · ${p.label}`;
-  const subjects: { id: string; subject: VolumeSlideSubject }[] = [
-    { id: "volume-wiag", subject: "WIAG" },
-    { id: "volume-awkg", subject: "AWKG" },
-    { id: "volume-lm", subject: "Liqui Moly" },
-    { id: "volume-total", subject: "Total" },
-  ];
+  const who = focus ?? "Würth";
+  const footer = `QBR Neele-Vat × ${who} · ${p.label}`;
+  const subjects: { id: string; subject: VolumeSlideSubject }[] = focus
+    ? [{ id: "volume-total", subject: "Total" }]
+    : [
+        { id: "volume-wiag", subject: "WIAG" },
+        { id: "volume-awkg", subject: "AWKG" },
+        { id: "volume-lm", subject: "Liqui Moly" },
+        { id: "volume-total", subject: "Total" },
+      ];
   return [
     {
       id: "cover",
       title: "Cover",
       render: () => (
-        <CoverSlide eyebrow={REVIEW[p.kind] ?? "Business Review"} title="Neele-Vat × Würth review" subline={`Würth × Neele-Vat · ${p.label}`} date={longDate(meetingDate)} />
+        <CoverSlide eyebrow={REVIEW[p.kind] ?? "Business Review"} title={`Neele-Vat × ${who} review`} subline={`${focus ? `Würth ${focus}` : "Würth"} × Neele-Vat · ${p.label}`} date={longDate(meetingDate)} />
       ),
     },
     {
       id: "divider-workload",
       title: "Section 01 Workload",
       render: (page, total) => (
-        <DividerSlide number="01" title="Workload" subtitle="Volume per principal, daily workload and on time performance." footer={footer} page={page} total={total} />
+        <DividerSlide number="01" title="Workload" subtitle={focus ? "Volume, daily workload and on time performance." : "Volume per principal, daily workload and on time performance."} footer={footer} page={page} total={total} />
       ),
     },
     ...subjects.map(({ id, subject }) => ({
       id,
-      title: subject === "Total" ? "Total volume" : `${subject} volume`,
+      title: subject === "Total" ? (focus ? `${focus} volume` : "Total volume") : `${subject} volume`,
       render: (page: number, total: number) => <VolumeSlide model={volumeSlide(set, subject)} page={page} total={total} />,
     })),
     {
@@ -120,6 +129,6 @@ export function buildDeck(set: ReportSet, meetingDate: Date): SlideDef[] {
       title: "Storage per destination",
       render: (page: number, total: number) => <DestinationsSlide model={destinationsSlide(set)} page={page} total={total} />,
     },
-    { id: "closing", title: "Closing", render: () => <ClosingSlide footer={`Würth · ${p.label}`} /> },
+    { id: "closing", title: "Closing", render: () => <ClosingSlide footer={`${focus ? `Würth ${focus}` : "Würth"} · ${p.label}`} /> },
   ];
 }

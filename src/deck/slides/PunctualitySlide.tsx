@@ -2,6 +2,8 @@ import { fmtDec } from "../../core/slides/format";
 import type { PunctualitySlideModel } from "../../core/slides/punctuality";
 import type { MainPrincipal } from "../../core/types";
 import { ANIM, entry, useAnimate, useTweenNumber } from "../anim";
+import { useFocus } from "../focus";
+import { PrincipalToggle } from "../PrincipalToggle";
 import { SlideShell } from "../SlideShell";
 import { T } from "../tokens";
 
@@ -16,13 +18,14 @@ const BELOW = "#B5652B";
  * monthly chart per principal with the target line.
  */
 export function PunctualitySlide({ model, page, total }: { model: PunctualitySlideModel; page: number; total: number }) {
+  const focus = useFocus();
   return (
-    <SlideShell title={model.title} page={page} total={total}>
+    <SlideShell title={model.title} topBar={focus ? <PrincipalToggle options={[]} selected="" onSelect={() => {}} /> : undefined} page={page} total={total}>
       <div style={{ display: "grid", gridTemplateColumns: "1.25fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
         <Card
           index={0}
           accent={T.heroText}
-          label="All principals"
+          label={focus ?? "All principals"}
           pct={model.pct}
           sub={`${model.ok.toLocaleString("nl-NL")} / ${model.measured.toLocaleString("nl-NL")} rides`}
           deltaPts={model.deltaPts}
@@ -45,7 +48,7 @@ export function PunctualitySlide({ model, page, total }: { model: PunctualitySli
                   {model.meetsTarget ? "Achieved" : "Below target"}
                 </span>
               )}
-              {model.secondary && model.secondary.pct !== null && (
+              {!focus && model.secondary && model.secondary.pct !== null && (
                 <span style={{ fontSize: 11, color: T.textSecondary, whiteSpace: "nowrap" }}>
                   {model.secondary.label}: <strong style={{ color: T.heroText }}>{fmtDec(model.secondary.pct)}%</strong>
                 </span>
@@ -53,7 +56,23 @@ export function PunctualitySlide({ model, page, total }: { model: PunctualitySli
             </div>
           }
         />
-        {model.perPrincipal.map((p, i) => (
+        {focus && (
+          <>
+            <Stat index={1} label="Rides measured" value={model.measured} />
+            {model.kind === "loading" ? (
+              <>
+                <Stat index={2} label="Late rides" value={model.late.total} />
+                <Stat index={3} label="Late by one workday" value={model.late.oneWorkday} />
+              </>
+            ) : (
+              <>
+                <Stat index={2} label="Over one workday" value={model.late.total} />
+                <Stat index={3} label="On the unloading day" value={model.secondary?.pct ?? 0} pct />
+              </>
+            )}
+          </>
+        )}
+        {!focus && model.perPrincipal.map((p, i) => (
           <Card
             key={p.principal}
             index={i + 1}
@@ -67,7 +86,7 @@ export function PunctualitySlide({ model, page, total }: { model: PunctualitySli
           />
         ))}
       </div>
-      <Chart model={model} />
+      <Chart model={model} principals={focus ? [focus] : PRINCIPALS} />
     </SlideShell>
   );
 }
@@ -142,7 +161,7 @@ const PRINCIPALS: MainPrincipal[] = ["WIAG", "AWKG", "Liqui Moly"];
 /** Bar label: one decimal, but a clean "100%" so neighbouring labels never touch. */
 const barValue = (v: number) => (v >= 99.95 ? "100%" : `${fmtDec(v)}%`);
 
-function Chart({ model }: { model: PunctualitySlideModel }) {
+function Chart({ model, principals: PRINCIPALS }: { model: PunctualitySlideModel; principals: MainPrincipal[] }) {
   const animate = useAnimate();
   const values = model.buckets.flatMap((b) => PRINCIPALS.map((p) => b.perPrincipal[p])).filter((v): v is number => v !== null);
   const low = Math.min(model.target, ...values);
@@ -154,16 +173,18 @@ function Chart({ model }: { model: PunctualitySlideModel }) {
   const PLOT_H = 274;
   const Y_W = 44;
   const n = model.buckets.length;
-  const barW = n <= 3 ? 44 : n <= 6 ? 32 : n <= 9 ? 20 : 13;
+  // One principal (a deck for one entity): wider bars with their values.
+  const single = PRINCIPALS.length === 1;
+  const barW = single ? (n <= 6 ? 56 : n <= 9 ? 44 : n <= 13 ? 30 : 16) : n <= 3 ? 44 : n <= 6 ? 32 : n <= 9 ? 20 : 13;
   const gap = n <= 6 ? 6 : 3;
-  const showValues = n <= 6;
+  const showValues = single ? n <= 13 : n <= 6;
   const y = (v: number) => PLOT_H - ((Math.max(yMin, Math.min(yMax, v)) - yMin) / (yMax - yMin)) * PLOT_H;
   const per = model.period.kind === "week" ? "Per day" : model.period.kind === "month" ? "Per week" : "Per month";
 
   return (
     <div style={{ flex: 1, minHeight: 0, background: T.card, borderRadius: 6, boxShadow: T.cardShadow, padding: "14px 22px 10px", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 24 }}>
-        <div style={{ fontSize: 12, color: T.textSecondary }}>{per} · per principal</div>
+        <div style={{ fontSize: 12, color: T.textSecondary }}>{per}{single ? "" : " · per principal"}</div>
         <div style={{ display: "flex", gap: 16, fontSize: 11, fontWeight: 500, color: T.heroText }}>
           {PRINCIPALS.map((p) => (
             <span key={p} style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -249,7 +270,7 @@ function Chart({ model }: { model: PunctualitySlideModel }) {
           </div>
           <div style={{ display: "flex", justifyContent: "space-around", padding: "0 8px", marginTop: 8 }}>
             {model.buckets.map((b) => (
-              <div key={b.key} style={{ width: barW * 3 + gap * 2, textAlign: "center", whiteSpace: "nowrap" }}>
+              <div key={b.key} style={{ width: Math.max(80, barW * PRINCIPALS.length + gap * (PRINCIPALS.length - 1)), textAlign: "center", whiteSpace: "nowrap" }}>
                 <div style={{ fontSize: 12, fontWeight: 500, color: T.heroText }}>{b.label}</div>
                 <div style={{ fontSize: 10.5, color: b.pct !== null && b.pct < model.target ? BELOW : T.textSecondary, marginTop: 2 }}>
                   {b.pct === null ? "" : `Total ${barValue(b.pct)}`}
@@ -259,6 +280,18 @@ function Chart({ model }: { model: PunctualitySlideModel }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Stat({ index, label, value, pct }: { index: number; label: string; value: number; pct?: boolean }) {
+  const animate = useAnimate();
+  const delay = index * ANIM.cardStagger;
+  const n = useTweenNumber(value, ANIM.count, delay);
+  return (
+    <div style={{ background: T.card, borderRadius: 6, boxShadow: T.cardShadow, borderTop: `3px solid ${T.heroText}`, padding: "12px 16px", ...entry(animate, "deckRiseIn", ANIM.cardIn, delay) }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: T.inbound, textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ fontSize: 30, fontWeight: 700, color: T.heroText, lineHeight: 1.05, marginTop: 6, fontVariantNumeric: "tabular-nums" }}>{pct ? `${fmtDec(n)}%` : Math.round(n).toLocaleString("nl-NL")}</div>
     </div>
   );
 }

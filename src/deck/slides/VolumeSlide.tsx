@@ -2,6 +2,7 @@ import { useState } from "react";
 import { fmtInt } from "../../core/slides/format";
 import type { ComparisonFigures, VolumePanel, VolumeSlideModel } from "../../core/slides/volume";
 import { ANIM, entry, useAnimate, useTweenNumber } from "../anim";
+import { useFocus } from "../focus";
 import { SlideShell } from "../SlideShell";
 import { FONT, T } from "../tokens";
 
@@ -12,7 +13,8 @@ import { FONT, T } from "../tokens";
  * stays calm while the change is still visible.
  */
 export function VolumeSlide({ model, page, total }: { model: VolumeSlideModel; page: number; total: number }) {
-  const title = model.subject === "Total" ? "Total volume" : `${model.subject} volume`;
+  const focus = useFocus();
+  const title = model.subject === "Total" ? (focus ? `${focus} volume` : "Total volume") : `${model.subject} volume`;
   return (
     <SlideShell title={title} page={page} total={total}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 18 }}>

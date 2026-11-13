@@ -224,6 +224,14 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B111 | Voorraad als gestapelde vlakgrafiek zoals in de Lovable-module (op verzoek), met de nieuwe berekening: punten = gemiddelde voorraad per maand (kwartaal: per week, week of maand: per dag), vorig jaar als stippellijn, hover per punt. Liqui Moly groen, AWKG lichtblauw, WIAG donkerblauw zodat de lagen te onderscheiden zijn. |
 | B112 | Containermix in ritten (containers), op verzoek. Per containersoort een liggende staaf; bij alle principals opgedeeld naar de hoofdprincipal van de rit (zodat de delen optellen tot het totaal), vorig jaar als streep. Kaarten: containers uit (met verschil), TEU (20ft = 1, 40ft = 2), aandeel volle containers en LCL. Soorten zonder ritten worden weggelaten. |
 
+## Presentatie voor één entiteit (13 nov)
+
+| # | Besluit |
+|---|---|
+| B113 | In stap 1 kies je de entiteit: Alle (standaard), WIAG, AWKG of Liqui Moly. De keuze wordt op deze computer onthouden. |
+| B114 | Bij één entiteit worden de gegevens zelf gefilterd vóór de berekening: alleen HU's van die entiteit en alleen ritten met HU's van die entiteit (als ritten van die entiteit alleen). Alle slides tonen dan alleen die entiteit, en een HTML-export bevat geen cijfers van de andere principals. Een rit met meerdere principals telt dus voor de gekozen entiteit mee. |
+| B115 | Deck bij één entiteit: voorpagina "Neele-Vat × WIAG review", één volumeslide ("WIAG volume"), geen knoppen maar een vast label met de naam, on time zonder kaarten van andere principals (in plaats daarvan gemeten ritten, te laat, één werkdag te laat of op de losdag). Bestandsnaam van de export bevat de entiteit. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

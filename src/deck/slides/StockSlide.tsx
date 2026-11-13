@@ -135,7 +135,8 @@ function Chart({ model, view }: { model: StockSlideModel; view: StockView }) {
   const [hover, setHover] = useState<number | null>(null);
   const pts = model.points;
   const n = pts.length;
-  const layers = view.key === "Total" ? LAYERS : [view.key as MainPrincipal];
+  // Only layers with stock (a deck for one entity has one layer).
+  const layers = view.key === "Total" ? LAYERS.filter((l) => model.points.some((p) => p.parts[l] > 0)) : [view.key as MainPrincipal];
   const totals = pts.map((p) => layers.reduce((a, l) => a + p.parts[l], 0));
   const ghosts = pts.map((p) => p.ghost[view.key]);
   const { max, ticks } = niceMax(Math.max(...totals, ...ghosts.map((g) => g ?? 0)));

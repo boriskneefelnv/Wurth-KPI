@@ -21,6 +21,8 @@ import {
 import { comparisonOptionsWithQuality, periodQuality, rideIssues } from "../src/core/report/quality";
 import { reconcileRideLists, reconcileVolume } from "../src/core/report/reconcile";
 import { computeReportSet } from "../src/core/report/report";
+import { focusOn } from "../src/core/report/focus";
+import { MAIN_PRINCIPALS, type MainPrincipal } from "../src/core/types";
 import { volumeSlide, type VolumeSlideSubject } from "../src/core/slides/volume";
 import { mergeWmsExports, parseWmsSheets, WMS_EXPORT_ROW_LIMIT } from "../src/core/wms/excel";
 import { enrichWms } from "../src/core/wms/enrich";
@@ -43,6 +45,8 @@ const { values: args } = parseArgs({
     compare: { type: "string", default: "" },
     out: { type: "string" },
     issues: { type: "string" },
+    /** One entity (WIAG, AWKG or "Liqui Moly"): the deck holds only its data. */
+    focus: { type: "string" },
   },
 });
 if (!args.units || !args.laden || !args.lossen) throw new Error("--units, --laden en --lossen zijn verplicht");
@@ -105,7 +109,10 @@ for (const dir of ["inbound", "outbound"] as const) {
   console.log(`  HU's per principal: ${JSON.stringify(rv.perPrincipal)}  zonder rit: ${rv.husWithoutRide}`);
 }
 
-const set = computeReportSet(enriched.units, period, comparisons, {}, rides);
+const focus = (args.focus ?? null) as MainPrincipal | null;
+if (focus && !(MAIN_PRINCIPALS as readonly string[]).includes(focus)) throw new Error(`--focus moet WIAG, AWKG of "Liqui Moly" zijn`);
+const data = focus ? focusOn(enriched.units, rides, focus) : { units: enriched.units, rides };
+const set = computeReportSet(data.units, period, comparisons, {}, data.rides);
 const subjects: VolumeSlideSubject[] = ["WIAG", "AWKG", "Liqui Moly", "Total"];
 console.log("");
 for (const s of subjects) {
@@ -116,14 +123,14 @@ for (const s of subjects) {
 }
 if (args.out) {
   mkdirSync(args.out, { recursive: true });
-  const file = join(args.out, `deck-${period.key}.html`);
+  const file = join(args.out, `deck-${period.key}${focus ? `-${focus.replace(" ", "")}` : ""}.html`);
   const meetingDate = new Date().toISOString().slice(0, 10);
-  const deck = buildDeck(set, new Date(`${meetingDate}T12:00:00`));
+  const deck = buildDeck(set, new Date(`${meetingDate}T12:00:00`), focus);
   const assets = loadDeckAssets();
   const flags = await loadDeckFlags(flagCodes(set));
   writeFileSync(
     file,
-    interactiveDeckDocument({ runtime: loadRuntime(), data: { set, meetingDate, assets, flags }, printSlides: renderSlidesStatic(deck, assets, flags), title: `QBR Würth ${period.label}` }),
+    interactiveDeckDocument({ runtime: loadRuntime(), data: { set, meetingDate, assets, flags, focus }, printSlides: renderSlidesStatic(deck, assets, flags, focus), title: `QBR Würth ${period.label}` }),
   );
   console.log(`\n${file}`);
 }

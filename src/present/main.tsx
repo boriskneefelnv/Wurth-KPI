@@ -5,6 +5,8 @@ import type { ReportSet } from "../core/report/report";
 import { AssetsContext, type DeckAssets } from "../deck/assets";
 import { buildDeck } from "../deck/deck";
 import { FlagsContext, type DeckFlags } from "../deck/flags";
+import { FocusContext } from "../deck/focus";
+import type { MainPrincipal } from "../core/types";
 import { Presentation } from "../deck/Presentation";
 
 export interface EmbeddedDeck {
@@ -12,6 +14,7 @@ export interface EmbeddedDeck {
   meetingDate: string;
   assets: DeckAssets;
   flags?: DeckFlags;
+  focus?: MainPrincipal | null;
 }
 
 declare global {
@@ -21,11 +24,13 @@ declare global {
 }
 
 const deck = window.__DECK__;
-const slides = buildDeck(deck.set, new Date(`${deck.meetingDate}T12:00:00`));
+const slides = buildDeck(deck.set, new Date(`${deck.meetingDate}T12:00:00`), deck.focus ?? null);
 createRoot(document.getElementById("root")!).render(
   <AssetsContext.Provider value={deck.assets}>
     <FlagsContext.Provider value={deck.flags ?? {}}>
-      <Presentation slides={slides} standalone />
+      <FocusContext.Provider value={deck.focus ?? null}>
+        <Presentation slides={slides} standalone />
+      </FocusContext.Provider>
     </FlagsContext.Provider>
   </AssetsContext.Provider>,
 );

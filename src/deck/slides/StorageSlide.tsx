@@ -6,7 +6,7 @@ import { PrincipalToggle } from "../PrincipalToggle";
 import { SlideShell } from "../SlideShell";
 import { T } from "../tokens";
 
-const PLOT_H = 236;
+const PLOT_H = 290;
 const glide = `height ${ANIM.switch}ms ease-out, bottom ${ANIM.switch}ms ease-out`;
 
 /**
