@@ -244,7 +244,6 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B121 | Soort klacht automatisch uit het onderwerp: Damage, Stowing, Missing or not loaded, Dangerous goods and labels, Process and documents, Other (eerste treffer telt). |
 | B122 | Vergelijking met een eerdere periode alleen als de klachtenexport zo ver teruggaat (vanaf de maand van de eerste klacht); anders zou die periode ten onrechte klachtvrij lijken. |
 | B123 | Sectie 03 Quality met twee slides (Complaints, Complaints by type met de laatste klachten), alleen als er een klachtenexport is ingeladen. Bij één entiteit alleen de klachten van die entiteit. |
-
 | B124 | "Not assessed" (HD-velden nog leeg) overal gestreept geel, met een geel label in de lijst en "x not assessed yet" op de kaart, zodat direct zichtbaar is dat de beoordeling nog moet gebeuren (op verzoek). |
 
 ## Open vragen
