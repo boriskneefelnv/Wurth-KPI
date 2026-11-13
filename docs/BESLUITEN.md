@@ -246,6 +246,14 @@ Onderbouwing: ruim 2.100 inkomende en 2.400 uitgaande ritten; netto verschil tus
 | B123 | Sectie 03 Quality met twee slides (Complaints, Complaints by type met de laatste klachten), alleen als er een klachtenexport is ingeladen. Bij één entiteit alleen de klachten van die entiteit. |
 | B124 | "Not assessed" (HD-velden nog leeg) overal gestreept geel, met een geel label in de lijst en "x not assessed yet" op de kaart, zodat direct zichtbaar is dat de beoordeling nog moet gebeuren (op verzoek). |
 
+## Containersoorten, één entiteit zonder labels (13 nov)
+
+| # | Besluit |
+|---|---|
+| B125 | "Unknown" bij de containermix kwam van 14 van de 1.440 ritten (jan t/m sep 2026): 11 retourzendingen ("RETURN AWKG", "RETURN ORDER" in het zegelveld) en 3 ritten waarbij Containertype in de WMS leeg is. Retouren zijn nu een eigen soort "RET, Return to principal"; de rest heet "Type not recorded". |
+| B126 | TEU is vervangen door "HUs per container" (gemiddelde belading per uitgaande rit), op verzoek: TEU is onduidelijk. |
+| B127 | Bij één entiteit geen naamlabel bovenaan en geen legenda-items met alleen die entiteit; on time heet dan "Rides loaded on time" en de dubbele "Total" onder de maanden vervalt. |
+
 ## Open vragen
 
 1. ~~Opdrachtgevers~~: bevestigd, Würth Logistics AG = WIAG.

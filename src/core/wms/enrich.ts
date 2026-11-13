@@ -74,7 +74,7 @@ const TWENTY_FOOT_RE = /(?:^|[^0-9])(?:20\s*(?:'|ft|foot|feet|gp|dv|dc|std)|2[24
 
 /**
  * Classify shipment type. Order matters (first rule wins):
- * 40S codes → 40H codes → 20S codes → 20ft text pattern → seal LCL/AIR/FCA → Onbekend.
+ * 40S codes → 40H codes → 20S codes → 20ft text pattern → seal RETURN/LCL/AIR/FCA → Onbekend.
  */
 export function classifyShipmentType(containertype: string, seals: readonly string[]): ShipmentType {
   const code = alnumUpper(containertype);
@@ -83,6 +83,7 @@ export function classifyShipmentType(containertype: string, seals: readonly stri
   }
   if ([containertype, ...seals].some((t) => TWENTY_FOOT_RE.test(t))) return "20S";
   const sealText = seals.join(" ").toLowerCase();
+  if (/\breturn\b|\bretour\b/.test(sealText)) return "RET";
   if (sealText.includes("lcl")) return "LCL";
   if (sealText.includes("air")) return "AIR";
   if (sealText.includes("fca")) return "FCA";

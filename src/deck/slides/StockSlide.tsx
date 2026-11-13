@@ -167,7 +167,7 @@ function Chart({ model, view }: { model: StockSlideModel; view: StockView }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
         <div style={{ fontSize: 12, color: T.textSecondary }}>Average HUs in stock {model.pointUnit}</div>
         <div style={{ display: "flex", gap: 16, fontSize: 11, fontWeight: 500, color: T.heroText }}>
-          {layers.map((p) => (
+          {layers.length > 1 && layers.map((p) => (
             <Legend key={p} el={<span style={{ width: 11, height: 11, borderRadius: 2, background: PRINCIPAL_BLUE[p] }} />} label={p} />
           ))}
           {ghostLine && model.ghostLabel && <Legend el={<span style={{ width: 16, borderTop: `2px dashed ${T.heroText}` }} />} label={model.ghostLabel} />}

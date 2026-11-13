@@ -20,10 +20,10 @@ export const TYPE_LABEL: Record<ShipmentType, string> = {
   LCL: "LCL, part load",
   AIR: "Air freight",
   FCA: "FCA",
-  Onbekend: "Unknown",
+  RET: "Return to principal",
+  Onbekend: "Type not recorded",
 };
 
-const TEU: Record<ShipmentType, number> = { "40S": 2, "40H": 2, "20S": 1, LCL: 0, AIR: 0, FCA: 0, Onbekend: 0 };
 const ALL: ShipmentType[] = [...KNOWN_SHIPMENT_TYPES, "Onbekend"];
 
 export interface MixRow {
@@ -44,7 +44,8 @@ export interface MixView {
   label: string;
   rides: number;
   ridesDeltaPct: number | null;
-  teu: number;
+  /** Outbound HUs per container (ride), on average. */
+  husPerContainer: number | null;
   /** Shares in %: full containers (20/40ft), LCL, and everything else. */
   fullShare: number | null;
   lclShare: number | null;
@@ -97,10 +98,10 @@ export function containerMixSlide(set: ReportSet): MixSlideModel {
         label: key === "Total" ? "All principals" : key,
         rides,
         ridesDeltaPct: prevRides > 0 ? deltaPct(rides, prevRides) : null,
-        teu: ALL.reduce((a, t) => a + counts[t] * TEU[t], 0),
+        husPerContainer: rides ? set.current.perspectives.hus.volume.outbound[key].total / rides : null,
         fullShare: share(counts["40S"] + counts["40H"] + counts["20S"]),
         lclShare: share(counts.LCL),
-        otherShare: share(counts.AIR + counts.FCA + counts.Onbekend),
+        otherShare: share(counts.AIR + counts.FCA + counts.RET + counts.Onbekend),
         rows,
       };
       return [key, view];

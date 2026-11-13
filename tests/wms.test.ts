@@ -199,3 +199,11 @@ describe("mergeWmsExports", () => {
     expect(merged.sources.map((s) => s.added)).toEqual([3, 1]);
   });
 });
+
+describe("returns", () => {
+  it("are their own container type", async () => {
+    const { classifyShipmentType } = await import("@/core/wms/enrich");
+    expect(classifyShipmentType("", ["", "", "RETURN AWKG SHUTTLE"])).toBe("RET");
+    expect(classifyShipmentType("", ["", "CETEM", "RWG"])).toBe("Onbekend");
+  });
+});

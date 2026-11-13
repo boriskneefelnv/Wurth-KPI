@@ -16,7 +16,7 @@ describe("container mix slide model", () => {
     expect(t.rows.map((r) => [r.code, r.rides])).toEqual([["LCL", 2], ["AIR", 1], ["FCA", 1]]);
     expect(t.rows[0]!.parts).toEqual([{ principal: "WIAG", rides: 2 }]);
     expect(t.lclShare).toBe(50);
-    expect(t.teu).toBe(0);
+    expect(t.husPerContainer).toBe(1);
   });
 
   it("filters per principal", () => {

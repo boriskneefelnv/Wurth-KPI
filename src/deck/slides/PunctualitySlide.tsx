@@ -3,7 +3,6 @@ import type { PunctualitySlideModel } from "../../core/slides/punctuality";
 import type { MainPrincipal } from "../../core/types";
 import { ANIM, entry, useAnimate, useTweenNumber } from "../anim";
 import { useFocus } from "../focus";
-import { PrincipalToggle } from "../PrincipalToggle";
 import { SlideShell } from "../SlideShell";
 import { T } from "../tokens";
 
@@ -20,12 +19,12 @@ const BELOW = "#B5652B";
 export function PunctualitySlide({ model, page, total }: { model: PunctualitySlideModel; page: number; total: number }) {
   const focus = useFocus();
   return (
-    <SlideShell title={model.title} topBar={focus ? <PrincipalToggle options={[]} selected="" onSelect={() => {}} /> : undefined} page={page} total={total}>
+    <SlideShell title={model.title} page={page} total={total}>
       <div style={{ display: "grid", gridTemplateColumns: "1.25fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
         <Card
           index={0}
           accent={T.heroText}
-          label={focus ?? "All principals"}
+          label={focus ? model.label : "All principals"}
           pct={model.pct}
           sub={`${model.ok.toLocaleString("nl-NL")} / ${model.measured.toLocaleString("nl-NL")} rides`}
           deltaPts={model.deltaPts}
@@ -186,7 +185,7 @@ function Chart({ model, principals: PRINCIPALS }: { model: PunctualitySlideModel
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 24 }}>
         <div style={{ fontSize: 12, color: T.textSecondary }}>{per}{single ? "" : " · per principal"}</div>
         <div style={{ display: "flex", gap: 16, fontSize: 11, fontWeight: 500, color: T.heroText }}>
-          {PRINCIPALS.map((p) => (
+          {PRINCIPALS.length > 1 && PRINCIPALS.map((p) => (
             <span key={p} style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <span style={{ width: 11, height: 11, borderRadius: 2, background: PRINCIPAL_BLUE[p] }} />
               {p}
@@ -273,7 +272,7 @@ function Chart({ model, principals: PRINCIPALS }: { model: PunctualitySlideModel
               <div key={b.key} style={{ width: Math.max(80, barW * PRINCIPALS.length + gap * (PRINCIPALS.length - 1)), textAlign: "center", whiteSpace: "nowrap" }}>
                 <div style={{ fontSize: 12, fontWeight: 500, color: T.heroText }}>{b.label}</div>
                 <div style={{ fontSize: 10.5, color: b.pct !== null && b.pct < model.target ? BELOW : T.textSecondary, marginTop: 2 }}>
-                  {b.pct === null ? "" : `Total ${barValue(b.pct)}`}
+                  {b.pct === null || single ? "" : `Total ${barValue(b.pct)}`}
                 </div>
               </div>
             ))}

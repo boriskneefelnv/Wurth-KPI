@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fmtInt } from "../../core/slides/format";
+import { fmtDec, fmtInt } from "../../core/slides/format";
 import type { MixKey, MixSlideModel, MixView } from "../../core/slides/containerMix";
 import type { MainPrincipal } from "../../core/types";
 import { ANIM, entry, useAnimate, useTweenNumber } from "../anim";
@@ -26,16 +26,16 @@ export function ContainerMixSlide({ model, page, total }: { model: MixSlideModel
     >
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
         <Card index={0} label="Containers outbound" value={view.rides} delta={view.ridesDeltaPct} deltaLabel={model.comparisonLabel} sub="Outbound rides" />
-        <Card index={1} label="TEU" value={view.teu} sub="20ft = 1, 40ft = 2" />
+        <Card index={1} label="HUs per container" value={view.husPerContainer} decimals sub="Average load per outbound ride" />
         <Card index={2} label="Full containers" value={view.fullShare} pct sub="20ft and 40ft" />
-        <Card index={3} label="LCL" value={view.lclShare} pct sub={view.otherShare ? `Air, FCA and unknown: ${view.otherShare < 1 ? "<1" : fmtInt(view.otherShare)}%` : "Part loads"} />
+        <Card index={3} label="LCL" value={view.lclShare} pct sub={view.otherShare ? `Air, FCA, returns and other: ${view.otherShare < 1 ? "<1" : fmtInt(view.otherShare)}%` : "Part loads"} />
       </div>
       <Chart model={model} view={view} />
     </SlideShell>
   );
 }
 
-function Card({ index, label, value, pct, sub, delta, deltaLabel }: { index: number; label: string; value: number | null; pct?: boolean; sub: string; delta?: number | null; deltaLabel?: string | null }) {
+function Card({ index, label, value, pct, decimals, sub, delta, deltaLabel }: { index: number; label: string; value: number | null; pct?: boolean; decimals?: boolean; sub: string; delta?: number | null; deltaLabel?: string | null }) {
   const animate = useAnimate();
   const delay = index * ANIM.cardStagger;
   const n = useTweenNumber(value ?? 0, ANIM.count, delay);
@@ -43,7 +43,7 @@ function Card({ index, label, value, pct, sub, delta, deltaLabel }: { index: num
     <div style={{ background: T.card, borderRadius: 6, boxShadow: T.cardShadow, borderTop: `3px solid ${T.heroText}`, padding: "11px 16px", ...entry(animate, "deckRiseIn", ANIM.cardIn, delay) }}>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: T.inbound, textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</div>
       <div style={{ fontSize: 30, fontWeight: 700, color: T.heroText, lineHeight: 1.05, marginTop: 5, fontVariantNumeric: "tabular-nums" }}>
-        {value === null ? "n/a" : `${fmtInt(n)}${pct ? "%" : ""}`}
+        {value === null ? "n/a" : `${decimals ? fmtDec(n) : fmtInt(n)}${pct ? "%" : ""}`}
       </div>
       <div style={{ marginTop: 6, minHeight: 19, ...entry(animate, "deckFadeIn", ANIM.badgeIn, ANIM.badgeDelay + delay) }}>
         {delta != null && deltaLabel ? (
@@ -79,11 +79,9 @@ function Chart({ model, view }: { model: MixSlideModel; view: MixView }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
         <div style={{ fontSize: 12, color: T.textSecondary }}>Outbound containers per type</div>
         <div style={{ display: "flex", gap: 16, fontSize: 11, fontWeight: 500, color: T.heroText }}>
-          {stacked ? (
-            (Object.keys(PART_COLOR) as (MainPrincipal | "Other")[]).filter((p) => used.has(p)).map((p) => <Legend key={p} el={<span style={{ width: 11, height: 11, borderRadius: 2, background: PART_COLOR[p] }} />} label={p} />)
-          ) : (
-            <Legend el={<span style={{ width: 11, height: 11, borderRadius: 2, background: T.bluePrimary }} />} label="Containers" />
-          )}
+          {/* Only a legend when there is something to tell apart. */}
+          {stacked && used.size > 1 &&
+            (Object.keys(PART_COLOR) as (MainPrincipal | "Other")[]).filter((p) => used.has(p)).map((p) => <Legend key={p} el={<span style={{ width: 11, height: 11, borderRadius: 2, background: PART_COLOR[p] }} />} label={p} />)}
           {showGhost && model.ghostLabel && <Legend el={<span style={{ width: 2, height: 12, background: T.heroText }} />} label={model.ghostLabel} />}
         </div>
       </div>

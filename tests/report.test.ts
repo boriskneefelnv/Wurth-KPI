@@ -275,7 +275,7 @@ describe("daily volume", () => {
 describe("profiles and flow", () => {
   const base = {
     hus: 100,
-    typeCounts: { "40S": 0, "40H": 0, "20S": 0, LCL: 0, AIR: 0, FCA: 0 },
+    typeCounts: { "40S": 0, "40H": 0, "20S": 0, LCL: 0, AIR: 0, FCA: 0, RET: 0 },
     usedTypes: 1,
     dominantType: "40H" as const,
     dominantShare: 0.7,

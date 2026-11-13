@@ -14,7 +14,8 @@ export type Principal = (typeof PRINCIPALS)[number];
 export const MAIN_PRINCIPALS = ["WIAG", "AWKG", "Liqui Moly"] as const;
 export type MainPrincipal = (typeof MAIN_PRINCIPALS)[number];
 
-export const KNOWN_SHIPMENT_TYPES = ["40S", "40H", "20S", "LCL", "AIR", "FCA"] as const;
+/** RET: returns to the principal ("RETURN …" in the seal fields), not an export container. */
+export const KNOWN_SHIPMENT_TYPES = ["40S", "40H", "20S", "LCL", "AIR", "FCA", "RET"] as const;
 export type KnownShipmentType = (typeof KNOWN_SHIPMENT_TYPES)[number];
 export type ShipmentType = KnownShipmentType | "Onbekend";
 
